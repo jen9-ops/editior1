@@ -67,6 +67,30 @@
     #console .lvl.WARN { color: #e0af68; }
     #console .lvl.INFO { color: var(--accent-primary); }
     #console .lvl.LOG { color: var(--text-secondary); }
+    
+    /* Fix for CodeMirror line numbers */
+    .CodeMirror-gutters {
+      background-color: var(--bg-tertiary) !important;
+      border-right: 1px solid var(--border-color) !important;
+    }
+    .CodeMirror-linenumber {
+      color: var(--text-secondary) !important;
+    }
+    .CodeMirror {
+      height: 100% !important;
+      font-family: 'Fira Code', 'Monaco', 'Cascadia Code', monospace !important;
+      font-size: 14px;
+    }
+    
+    /* Fix for tab layout */
+    .nav-tabs {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+    .nav-tabs .nav-item {
+      flex-shrink: 0;
+    }
   </style>
 </head>
 <body>
@@ -127,7 +151,30 @@
   </div>
 </div>
 <div id="toast-container"></div>
-<div class="modal fade" id="libsModal"></div>
+<div class="modal fade" id="libsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">📚 Менеджер бібліотек</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">Додати бібліотеку (URL)</label>
+          <div class="input-group">
+            <input type="text" class="form-control" id="libUrl" placeholder="https://cdn.example.com/library.js">
+            <button class="btn btn-primary" id="addLibBtn">Додати</button>
+          </div>
+          <div class="form-text">Введіть URL CSS або JS бібліотеки</div>
+        </div>
+        <div class="mt-3">
+          <h6>Активні бібліотеки</h6>
+          <div id="libsList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -138,6 +185,7 @@ const LS_WRAP = 'wrap_pref_v2';
 const LS_AUTOREFRESH = 'auto_refresh_pref_v1';
 const LS_OFFLINE_MODE = 'offline_mode_v1';
 const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
 
 let editors = {}; let projectFiles = []; let libs = []; let activeFile = ''; let runWin = null;
 let wrapOption = false; let autoRefreshEnabled = false; let offlineModeEnabled = false;
@@ -178,9 +226,78 @@ function updateContextualUI(filename) {
 }
 
 // ===== LIBRARY MANAGEMENT =====
-function loadLibs() { try { return JSON.parse(localStorage.getItem(LS_LIBS) || '[]'); } catch { return []; } }
-function saveLibs() { localStorage.setItem(LS_LIBS, JSON.stringify(libs)); }
-function buildLibTags() { return libs.filter(l => l.enabled).map(l => { const u = (l.url || '').trim().toLowerCase(); return u.endsWith('.css') ? `<link rel="stylesheet" href="${l.url}">` : `<script src="${l.url}"><\/script>`; }).join(''); }
+function loadLibs() { 
+  try { 
+    const savedLibs = localStorage.getItem(LS_LIBS);
+    return savedLibs ? JSON.parse(savedLibs) : []; 
+  } catch(e) { 
+    console.error("Помилка завантаження бібліотек:", e);
+    return []; 
+  } 
+}
+
+function saveLibs() { 
+  try {
+    localStorage.setItem(LS_LIBS, JSON.stringify(libs)); 
+  } catch(e) {
+    console.error("Помилка збереження бібліотек:", e);
+  }
+}
+
+function buildLibTags() { 
+  return libs.filter(l => l.enabled).map(l => { 
+    const u = (l.url || '').trim().toLowerCase(); 
+    return u.endsWith('.css') ? 
+      `<link rel="stylesheet" href="${l.url}">` : 
+      `<script src="${l.url}"><\/script>`; 
+  }).join(''); 
+}
+
+function renderLibsList() {
+  const libsList = $('#libsList');
+  if (!libsList) return;
+  
+  libsList.innerHTML = '';
+  
+  if (libs.length === 0) {
+    libsList.innerHTML = '<div class="text-center py-3 text-muted">Немає доданих бібліотек</div>';
+    return;
+  }
+  
+  libs.forEach((lib, index) => {
+    const libItem = document.createElement('div');
+    libItem.className = 'lib-item d-flex align-items-center justify-content-between py-2 border-bottom';
+    libItem.innerHTML = `
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="lib-${index}" ${lib.enabled ? 'checked' : ''}>
+        <label class="form-check-label" for="lib-${index}" title="${lib.url}">
+          ${lib.url.length > 40 ? lib.url.substring(0, 40) + '...' : lib.url}
+        </label>
+      </div>
+      <button class="btn btn-sm btn-danger lib-remove" data-index="${index}">×</button>
+    `;
+    libsList.appendChild(libItem);
+  });
+  
+  // Add event listeners
+  $$('.lib-item input').forEach((checkbox, index) => {
+    checkbox.addEventListener('change', (e) => {
+      libs[index].enabled = e.target.checked;
+      saveLibs();
+      showToast('Налаштування збережено');
+    });
+  });
+  
+  $$('.lib-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const index = parseInt(e.target.dataset.index);
+      libs.splice(index, 1);
+      saveLibs();
+      renderLibsList();
+      showToast('Бібліотеку видалено');
+    });
+  });
+}
 
 // ===== CORE FILE & TAB MANAGEMENT =====
 function createTab(filename, content = '', isActive = false) {
@@ -195,70 +312,161 @@ function createTab(filename, content = '', isActive = false) {
     const paneContainer = $('#editor-panes');
     const pane = document.createElement('div');
     pane.className = `tab-pane fade ${isActive ? 'show active' : ''}`; pane.id = paneId;
-    const textarea = document.createElement('textarea'); pane.appendChild(textarea);
+    const textarea = document.createElement('textarea'); 
+    textarea.className = 'editor-textarea';
+    pane.appendChild(textarea);
     paneContainer.appendChild(pane);
 
     const mode = getEditorMode(filename);
-    const editorOptions = { lineNumbers: true, mode: mode, theme: 'dracula', lineWrapping: wrapOption };
+    const editorOptions = { 
+      lineNumbers: true, 
+      mode: mode, 
+      theme: 'dracula', 
+      lineWrapping: wrapOption,
+      indentUnit: 2,
+      tabSize: 2,
+      indentWithTabs: false,
+      electricChars: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      autoCloseTags: true
+    };
+    
     if (mode === 'htmlmixed' || mode === 'css') {
-        editorOptions.extraKeys = { 'Tab': 'emmetExpandAbbreviation', 'Enter': 'emmetInsertLineBreak' };
+        editorOptions.extraKeys = { 
+          'Tab': 'emmetExpandAbbreviation', 
+          'Enter': 'emmetInsertLineBreak',
+          'Ctrl-Space': 'autocomplete'
+        };
     }
 
     const editor = CodeMirror.fromTextArea(textarea, editorOptions);
     editor.setValue(content);
-    editor.on('change', () => { markDirty(); if (autoRefreshEnabled && runWin && !runWin.closed) { debouncedRefresh(); } });
+    editor.on('change', () => { 
+      markDirty(); 
+      if (autoRefreshEnabled && runWin && !runWin.closed) { 
+        debouncedRefresh(); 
+      } 
+    });
     
     editors[filename] = editor;
-    if (!projectFiles.some(f => f.name === filename)) { projectFiles.push({ name: filename, content }); }
-    if (isActive) { activeFile = filename; updateContextualUI(filename); }
+    if (!projectFiles.some(f => f.name === filename)) { 
+      projectFiles.push({ name: filename, content }); 
+    }
+    if (isActive) { 
+      activeFile = filename; 
+      updateContextualUI(filename); 
+    }
+    
+    // Refresh editor after a short delay to ensure proper rendering
+    setTimeout(() => editor.refresh(), 100);
 }
 function switchTab(filename) { 
     const tabButton = $(`button[data-filename="${filename}"]`); 
     if (tabButton) { 
-        const tab = new bootstrap.Tab(tabButton);
-        tab.show();
+        const tabInstance = new bootstrap.Tab(tabButton);
+        tabInstance.show();
         activeFile = filename; 
         updateContextualUI(filename);
-        setTimeout(() => editors[filename] && editors[filename].refresh(), 50); 
+        setTimeout(() => {
+          if (editors[filename]) {
+            editors[filename].refresh();
+            editors[filename].focus();
+          }
+        }, 50); 
     } 
 }
 function closeTab(filename) { 
     if (filename === 'index.html') return; 
-    $(`button[data-filename="${filename}"]`).parentElement.remove(); 
-    $(`#pane-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`).remove(); 
+    
+    // Find and remove tab
+    const tabElement = $(`button[data-filename="${filename}"]`).closest('.nav-item');
+    if (tabElement) tabElement.remove();
+    
+    // Find and remove pane
+    const paneId = `pane-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const paneElement = $(`#${paneId}`);
+    if (paneElement) paneElement.remove();
+    
+    // Clean up references
     delete editors[filename]; 
     projectFiles = projectFiles.filter(f => f.name !== filename); 
     
-    // Переключитись на іншу вкладку, якщо закрили активну
+    // Switch to another tab if we closed the active one
     if (activeFile === filename) {
-        const nextFile = projectFiles.length > 0 ? projectFiles[0].name : '';
-        if (nextFile) switchTab(nextFile);
+        const remainingFiles = Object.keys(editors);
+        if (remainingFiles.length > 0) {
+            switchTab(remainingFiles[0]);
+        } else {
+            activeFile = '';
+        }
     }
     
     markDirty(); 
 }
-
-function resetUI() { $('#editor-tabs').innerHTML = ''; $('#editor-panes').innerHTML = ''; editors = {}; projectFiles = []; }
+function resetUI() { 
+    $('#editor-tabs').innerHTML = ''; 
+    $('#editor-panes').innerHTML = ''; 
+    editors = {}; 
+    projectFiles = []; 
+}
 
 // ===== PROJECT SAVE/LOAD & OFFLINE =====
 let dirty = false;
 function markDirty() { dirty = true; setSavingPill(true); debouncedSave(); }
-const saveProject = () => { projectFiles.forEach(file => { if (editors[file.name]) { file.content = editors[file.name].getValue(); } }); localStorage.setItem(LS_PROJECT, JSON.stringify(projectFiles)); dirty = false; setSavingPill(false); };
+const saveProject = () => { 
+    projectFiles.forEach(file => { 
+        if (editors[file.name]) { 
+            file.content = editors[file.name].getValue(); 
+        } 
+    }); 
+    try {
+        localStorage.setItem(LS_PROJECT, JSON.stringify(projectFiles)); 
+        dirty = false; 
+        setSavingPill(false);
+    } catch(e) {
+        console.error("Помилка збереження проекту:", e);
+        showToast("Помилка збереження!");
+    }
+};
 const debouncedSave = debounce(saveProject, 1500);
 function loadProject() {
     const savedData = localStorage.getItem(LS_PROJECT);
-    if (savedData) { try { projectFiles = JSON.parse(savedData); if (!projectFiles.some(f => f.name === 'index.html')) throw new Error("No index.html"); } catch { projectFiles = []; } }
+    if (savedData) { 
+        try { 
+            projectFiles = JSON.parse(savedData); 
+            if (!projectFiles.some(f => f.name === 'index.html')) throw new Error("No index.html"); 
+        } catch { 
+            projectFiles = []; 
+        } 
+    }
     if (projectFiles.length === 0) {
         projectFiles = [
-            { name: 'index.html', content: '<h1>Hello, Emmet!</h1>\n<p>Try typing `p*3>lorem5` and pressing Tab or the ⚡️ button.</p>' },
-            { name: 'style.css', content: 'body { \n  font-family: sans-serif; \n  padding: 1rem; \n}' },
+            { name: 'index.html', content: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Мій проект</title>\n</head>\n<body>\n  <h1>Hello, Emmet!</h1>\n  <p>Try typing `p*3>lorem5` and pressing Tab or the ⚡️ button.</p>\n</body>\n</html>' },
+            { name: 'style.css', content: 'body { \n  font-family: sans-serif; \n  padding: 1rem; \n  background: #1a1b26;\n  color: #c0caf5;\n}' },
             { name: 'script.js', content: 'console.log("Welcome!");' }
         ];
     }
     resetUI();
     projectFiles.forEach((file, index) => createTab(file.name, file.content, index === 0));
 }
-function exportToZip() { saveProject(); const zip = new JSZip(); projectFiles.forEach(file => { zip.file(file.name, file.content); }); zip.generateAsync({type:"blob"}).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'project.zip'; a.click(); URL.revokeObjectURL(a.href); }); }
+function exportToZip() { 
+    saveProject(); 
+    const zip = new JSZip(); 
+    projectFiles.forEach(file => { 
+        zip.file(file.name, file.content); 
+    }); 
+    zip.generateAsync({type:"blob"}).then(blob => { 
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(blob); 
+        a.download = 'project.zip'; 
+        a.click(); 
+        URL.revokeObjectURL(a.href); 
+    }).catch(e => {
+        console.error("Помилка створення ZIP:", e);
+        showToast("Помилка створення архіву!");
+    }); 
+}
 async function loadProjectFromZip(file) {
     if (!file) return;
     try {
@@ -267,13 +475,22 @@ async function loadProjectFromZip(file) {
         const promises = [];
         zip.forEach((relativePath, zipEntry) => {
             if (!zipEntry.dir) {
-                const promise = zipEntry.async("string").then(content => { newProjectFiles.push({ name: relativePath, content: content }); });
+                const promise = zipEntry.async("string").then(content => { 
+                    newProjectFiles.push({ name: relativePath, content: content }); 
+                });
                 promises.push(promise);
             }
         });
         await Promise.all(promises);
-        if (!newProjectFiles.some(f => f.name === 'index.html')) { alert('Помилка: ZIP-архів має містити файл index.html'); return; }
-        newProjectFiles.sort((a, b) => { if (a.name === 'index.html') return -1; if (b.name === 'index.html') return 1; return a.name.localeCompare(b.name); });
+        if (!newProjectFiles.some(f => f.name === 'index.html')) { 
+            alert('Помилка: ZIP-архів має містити файл index.html'); 
+            return; 
+        }
+        newProjectFiles.sort((a, b) => { 
+            if (a.name === 'index.html') return -1; 
+            if (b.name === 'index.html') return 1; 
+            return a.name.localeCompare(b.name); 
+        });
         resetUI();
         projectFiles = newProjectFiles;
         projectFiles.forEach((f, index) => createTab(f.name, f.content, index === 0));
@@ -286,15 +503,20 @@ async function loadProjectFromZip(file) {
 }
 
 // ===== CONSOLE LOGIC =====
-function toggleConsole(h = 220) { const wrap = $('#consoleWrap'); wrap.style.height = (parseInt(wrap.style.height || '0', 10) > 0) ? '0px' : (h + 'px'); }
+function toggleConsole(h = 220) { 
+    const wrap = $('#consoleWrap'); 
+    wrap.style.height = (parseInt(wrap.style.height || '0', 10) > 0) ? '0px' : (h + 'px'); 
+}
 function pushLog(level, text) { 
     logs.push({level, text}); 
     const box = $('#console'); 
-    const line = document.createElement('div'); 
-    line.className = 'line'; 
-    line.innerHTML = `<span class="lvl ${level.toUpperCase()}">${level.toUpperCase()}:</span> ${text}`; 
-    box.appendChild(line); 
-    box.scrollTop = box.scrollHeight; 
+    if(parseInt($('#consoleWrap').style.height||'0',10)>0) { 
+        const line = document.createElement('div'); 
+        line.className = 'line'; 
+        line.innerHTML = `<span class="lvl ${level.toUpperCase()}">${level.toUpperCase()}:</span> ${text}`; 
+        box.appendChild(line); 
+        box.scrollTop = box.scrollHeight; 
+    } 
     logCount++; 
     $('#cCount').textContent = String(logCount); 
     $('#cDot').className = level.toUpperCase() === 'ERROR' ? 'dot err' : 'dot';
@@ -304,10 +526,10 @@ function execCmd() {
     if(!cmd.trim()) return; 
     cmdHistory.push(cmd); 
     histIdx = -1; 
-    if(runWin && !runWin.closed && runWin.execFromParent){ 
+    if(runWin && runWin.execFromParent){ 
         try {
             runWin.execFromParent(cmd); 
-        } catch (e) {
+        } catch(e) {
             pushLog('ERROR', 'Помилка виконання команди: ' + e.message);
         }
     } else { 
@@ -361,19 +583,18 @@ function copyLogToClipboard() {
 // ===== PWA & SERVICE WORKER =====
 function manageServiceWorker() {
     if (!('serviceWorker' in navigator)) { 
-        showToast('Service Worker не підтримується');
+        console.log('Service Worker не підтримується');
         return; 
     }
     
     if (offlineModeEnabled) {
         navigator.serviceWorker.getRegistration().then(reg => {
             if (!reg) { 
-                // Простий Service Worker для офлайн-роботи
+                // Simple service worker for offline
                 const swContent = `
                 self.addEventListener('install', event => {
                     event.waitUntil(self.skipWaiting());
                 });
-                
                 self.addEventListener('fetch', event => {
                     event.respondWith(
                         caches.match(event.request).then(response => {
@@ -387,7 +608,7 @@ function manageServiceWorker() {
                 const swUrl = URL.createObjectURL(blob);
                 
                 navigator.serviceWorker.register(swUrl)
-                    .then(reg => showToast('Офлайн-режим активовано.'))
+                    .then(reg => console.log('Service Worker registered'))
                     .catch(err => console.error('SW Registration Error:', err));
             }
         });
@@ -396,8 +617,7 @@ function manageServiceWorker() {
             if (registration) { 
                 registration.unregister().then(isUnregistered => { 
                     if (isUnregistered) { 
-                        showToast('Офлайн-режим вимкнено.'); 
-                        caches.keys().then(keys => keys.forEach(key => caches.delete(key))); 
+                        console.log('Service Worker unregistered');
                     } 
                 }); 
             }
@@ -441,17 +661,12 @@ function runCode() {
         runWin.close(); 
     } 
     
-    runWin = window.open(); 
+    runWin = window.open('', '_blank', 'width=800,height=600,menubar=no,toolbar=no,location=no'); 
     if (runWin) { 
         runWin.document.write(htmlContent); 
         runWin.document.close(); 
-        
-        // Додаємо обробник закриття вікна
-        runWin.onbeforeunload = function() {
-            runWin = null;
-        };
     } else { 
-        alert('Браузер заблокував спливаюче вікно.'); 
+        alert('Браузер заблокував спливаюче вікно. Дозвольте спливаючі вікна для цього сайту.'); 
     } 
 }
 const debouncedRefresh = debounce(runCode, 1500);
@@ -503,7 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (editors[activeFile]) { 
             try {
                 editors[activeFile].execCommand('emmetExpandAbbreviation'); 
-            } catch (e) {
+            } catch(e) {
                 showToast('Помилка Emmet: ' + e.message);
             }
         } 
@@ -597,13 +812,39 @@ document.addEventListener('DOMContentLoaded', () => {
         pushLog(level, text); 
     });
     
-    // Обробник для кнопки бібліотек
+    // Library management
     $('#mLibs').addEventListener('click', e => {
         e.preventDefault();
-        alert('Функціонал бібліотек буде реалізовано в майбутніх оновленнях');
+        renderLibsList();
+        const libsModal = new bootstrap.Modal($('#libsModal'));
+        libsModal.show();
     });
     
-    // Обробник зміни стану полноекранного режиму
+    $('#addLibBtn').addEventListener('click', () => {
+        const url = $('#libUrl').value.trim();
+        if (!url) {
+            showToast('Введіть URL бібліотеки');
+            return;
+        }
+        
+        // Basic URL validation
+        if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('//')) {
+            showToast('URL має починатися з http://, https:// або //');
+            return;
+        }
+        
+        libs.push({
+            url: url,
+            enabled: true
+        });
+        
+        saveLibs();
+        renderLibsList();
+        $('#libUrl').value = '';
+        showToast('Бібліотеку додано');
+    });
+    
+    // Handle fullscreen change
     document.addEventListener('fullscreenchange', () => {
         if (!document.fullscreenElement) {
             $('#icon-maximize').style.display = 'block';
