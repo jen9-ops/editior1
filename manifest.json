@@ -1,0 +1,21 @@
+{
+  "name": "Онлайн Редактор Коду",
+  "short_name": "Редактор",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#1a1b26",
+  "theme_color": "#1a1b26",
+  "description": "Простий онлайн редактор HTML, CSS, JavaScript з можливістю офлайн-роботи та підтримкою Emmet.",
+  "icons": [
+    {
+      "src": "./icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "./icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
