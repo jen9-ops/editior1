@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Онлайн редактор v15.1</title>
+  <title>Онлайн редактор</title>
 
   <link rel="manifest" href="./manifest.json">
   <meta name="theme-color" content="#1a1b26">
@@ -100,7 +100,20 @@
   </div>
 </div>
 
-<div id="consoleWrap"></div>
+<div id="consoleWrap">
+  <div class="c-head" id="consoleDrag">
+    <div class="title"><div id="cDot" class="dot"></div> <span>Консоль (<span id="cCount">0</span>)</span></div>
+    <div class="d-flex gap-1">
+      <button class="btn-icon-sm" id="copyLogBtn" title="Копіювати лог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
+      <button class="btn-icon-sm" id="downloadLog" title="Завантажити лог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+      <button class="btn-icon-sm" id="clearLog" title="Очистити лог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+    </div>
+  </div>
+  <div id="console"></div>
+  <div class="console-input">
+    <input id="consoleCmd" placeholder="Введіть JS команду..."><button id="execCmd">▶</button>
+  </div>
+</div>
 <div id="toast-container"></div>
 <div class="modal fade" id="libsModal"></div>
 
@@ -151,6 +164,11 @@ function updateContextualUI(filename) {
         emmetBtn.classList.add('hidden');
     }
 }
+
+// ===== LIBRARY MANAGEMENT =====
+function loadLibs() { try { return JSON.parse(localStorage.getItem(LS_LIBS) || '[]'); } catch { return []; } }
+function saveLibs() { localStorage.setItem(LS_LIBS, JSON.stringify(libs)); }
+function buildLibTags() { return libs.filter(l => l.enabled).map(l => { const u = (l.url || '').trim().toLowerCase(); return u.endsWith('.css') ? `<link rel="stylesheet" href="${l.url}">` : `<script src="${l.url}"><\/script>`; }).join(''); }
 
 // ===== CORE FILE & TAB MANAGEMENT =====
 function createTab(filename, content = '', isActive = false) {
@@ -204,7 +222,7 @@ function loadProject() {
     if (savedData) { try { projectFiles = JSON.parse(savedData); if (!projectFiles.some(f => f.name === 'index.html')) throw new Error("No index.html"); } catch { projectFiles = []; } }
     if (projectFiles.length === 0) {
         projectFiles = [
-            { name: 'index.html', content: '<h1>Hello, Emmet!</h1>\n<p>Try typing `p*3>lorem5` and pressing Tab.</p>' },
+            { name: 'index.html', content: '<h1>Hello, Emmet!</h1>\n<p>Try typing `p*3>lorem5` and pressing Tab or the ⚡️ button.</p>' },
             { name: 'style.css', content: 'body { \n  font-family: sans-serif; \n  padding: 1rem; \n}' },
             { name: 'script.js', content: 'console.log("Welcome!");' }
         ];
@@ -212,8 +230,41 @@ function loadProject() {
     resetUI();
     projectFiles.forEach((file, index) => createTab(file.name, file.content, index === 0));
 }
+function exportToZip() { saveProject(); const zip = new JSZip(); projectFiles.forEach(file => { zip.file(file.name, file.content); }); zip.generateAsync({type:"blob"}).then(blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'project.zip'; a.click(); URL.revokeObjectURL(a.href); }); }
+async function loadProjectFromZip(file) {
+    if (!file) return;
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const newProjectFiles = [];
+        const promises = [];
+        zip.forEach((relativePath, zipEntry) => {
+            if (!zipEntry.dir) {
+                const promise = zipEntry.async("string").then(content => { newProjectFiles.push({ name: relativePath, content: content }); });
+                promises.push(promise);
+            }
+        });
+        await Promise.all(promises);
+        if (!newProjectFiles.some(f => f.name === 'index.html')) { alert('Помилка: ZIP-архів має містити файл index.html'); return; }
+        newProjectFiles.sort((a, b) => { if (a.name === 'index.html') return -1; if (b.name === 'index.html') return 1; return a.name.localeCompare(b.name); });
+        resetUI();
+        projectFiles = newProjectFiles;
+        projectFiles.forEach((f, index) => createTab(f.name, f.content, index === 0));
+        saveProject();
+        showToast('Проєкт успішно завантажено!');
+    } catch (e) {
+        alert('Не вдалося прочитати ZIP-архів.');
+        console.error(e);
+    }
+}
 
-// ===== SERVICE WORKER & PWA =====
+// ===== CONSOLE LOGIC =====
+function toggleConsole(h = 220) { const wrap = $('#consoleWrap'); wrap.style.height = (parseInt(wrap.style.height || '0', 10) > 0) ? '0px' : (h + 'px'); }
+function pushLog(level, text) { logs.push({level, text}); const box = $('#console'); if(parseInt($('#consoleWrap').style.height||'0',10)>0) { const line = document.createElement('div'); line.className = 'line'; line.innerHTML = `<span class="lvl ${level.toUpperCase()}">${level.toUpperCase()}:</span> ${text}`; box.appendChild(line); box.scrollTop = box.scrollHeight; } logCount++; $('#cCount').textContent = String(logCount); $('#cDot').classList.toggle('err', level.toUpperCase() === 'ERROR'); }
+function execCmd() { const cmd = $('#consoleCmd').value; if(!cmd.trim()) return; cmdHistory.push(cmd); histIdx = -1; if(runWin && runWin.execFromParent){ runWin.execFromParent(cmd); } else { pushLog('ERROR','Вікно попереднього перегляду не запущено'); } $('#consoleCmd').value=''; }
+function copyLogToClipboard() { if (logs.length === 0) { showToast("Консоль порожня"); return; } const logText = logs.map(l => `[${l.level}] ${l.text}`).join('\n'); navigator.clipboard.writeText(logText).then(() => { showToast("Лог скопійовано!"); }).catch(() => { showToast("Помилка копіювання"); }); }
+(function enableConsoleDrag(){ const drag = $('#consoleDrag'), wrap = $('#consoleWrap'); let startY=0, startH=0, dragging=false; const onMove = y => { let nh = Math.max(100, Math.min(window.innerHeight*0.9, startH + (startY - y))); wrap.style.height = nh+'px'; }; drag.addEventListener('mousedown', e => { dragging=true; startY=e.clientY; startH=parseInt(getComputedStyle(wrap).height,10)||0; }); window.addEventListener('mousemove', e => { if(dragging) onMove(e.clientY); }); window.addEventListener('mouseup', () => { dragging=false; }); drag.addEventListener('touchstart', e => { dragging=true; startY=e.touches[0].clientY; startH=parseInt(getComputedStyle(wrap).height,10)||0; }, {passive: true}); window.addEventListener('touchmove', e => { if(dragging) onMove(e.touches[0].clientY); }, {passive: true}); window.addEventListener('touchend', () => { dragging=false; }); })();
+
+// ===== PWA & SERVICE WORKER =====
 function manageServiceWorker() {
     if (!('serviceWorker' in navigator)) { return; }
     if (offlineModeEnabled) {
@@ -226,33 +277,19 @@ function manageServiceWorker() {
         });
     }
 }
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const installBtn = $('#installPwaBtn');
-    if(installBtn) installBtn.classList.remove('hidden');
-});
-async function handleInstallClick() {
-    const installBtn = $('#installPwaBtn');
-    if (!deferredPrompt || !installBtn) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    installBtn.classList.add('hidden');
-}
-window.addEventListener('appinstalled', () => {
-    deferredPrompt = null;
-    showToast('Додаток успішно встановлено!');
-});
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; const installBtn = $('#installPwaBtn'); if(installBtn) installBtn.classList.remove('hidden'); });
+async function handleInstallClick() { const installBtn = $('#installPwaBtn'); if (!deferredPrompt || !installBtn) return; deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; deferredPrompt = null; installBtn.classList.add('hidden'); }
+window.addEventListener('appinstalled', () => { deferredPrompt = null; showToast('Додаток успішно встановлено!'); });
 
 // ===== RUN CODE & FULLSCREEN =====
-function runCode() { /* ... Compiles and runs the code in a new window ... */ }
+function buildRunHooks(){ return `<script>(function(){ function S(v){ try{return (typeof v==='object')?JSON.stringify(v):String(v);}catch(_){return String(v)} } function send(type,args){ try{ window.opener && window.opener.postMessage({from:'editor',type,data:[].slice.call(args).map(S)}, '*'); }catch(e){} } ['log','info','warn','error'].forEach(function(k){ var o=console[k]; console[k]=function(){ send(k,arguments); try{o.apply(console,arguments)}catch(_){} };}); window.addEventListener('error',e=>send('error',[ (e.message||'Error') + (e.filename?(' @ '+e.filename+':'+e.lineno):'') ])); window.addEventListener('unhandledrejection',e=>send('error',[ (e.reason && (e.reason.message||e.reason)) || 'Unhandled promise rejection' ])); window.execFromParent = function(cmd){ try{ var r = eval(cmd); send('log', ['> ' + cmd, r]); } catch(err){ send('error', [err && err.message ? err.message : String(err)]); } }; })();<\/script>`;}
+function runCode() { saveProject(); const mainHtmlFile = projectFiles.find(f => f.name === 'index.html'); if (!mainHtmlFile) return; let htmlContent = mainHtmlFile.content; const allCss = projectFiles.filter(f => f.name.endsWith('.css')).map(f => f.content).join('\n\n'); const cssBlock = `<style>\n${allCss}\n</style>`; const libTags = buildLibTags(); const hooks = buildRunHooks(); const allJsContent = projectFiles.filter(f => f.name.endsWith('.js')).map(f => f.content).join('\n\n// ----- \n\n'); const fullJsPayload = `(function(){\ntry {\n${allJsContent}\n} catch (e) { console.error(e); }\n})();`; const jsBlock = `<script>${safeScript(fullJsPayload)}<\/script>`; const headContent = `${libTags}\n${cssBlock}\n${hooks}`; if (htmlContent.includes('</head>')) { htmlContent = htmlContent.replace('</head>', `${headContent}\n</head>`); } else { htmlContent = `${headContent}\n${htmlContent}`; } if (htmlContent.includes('</body>')) { htmlContent = htmlContent.replace('</body>', `${jsBlock}\n</body>`); } else { htmlContent += jsBlock; } if (runWin && !runWin.closed) { runWin.close(); } runWin = window.open(); if (runWin) { runWin.document.write(htmlContent); runWin.document.close(); } else { alert('Браузер заблокував спливаюче вікно.'); } }
 const debouncedRefresh = debounce(runCode, 1500);
 function toggleFullScreen() { if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); } else if (document.exitFullscreen) { document.exitFullscreen(); } }
 
-
 // ===== INITIALIZATION & EVENT LISTENERS =====
 document.addEventListener('DOMContentLoaded', () => {
+    libs = loadLibs();
     wrapOption = localStorage.getItem(LS_WRAP) === '1';
     autoRefreshEnabled = localStorage.getItem(LS_AUTOREFRESH) === '1';
     offlineModeEnabled = localStorage.getItem(LS_OFFLINE_MODE) === '1';
@@ -264,22 +301,31 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProject();
     manageServiceWorker();
 
-    // Event listeners are complete and restored here
     $('#editor-tabs').addEventListener('click', e => { const closeBtn = e.target.closest('.tab-close-btn'); if (closeBtn) { e.stopPropagation(); const filename = closeBtn.dataset.filename; if (confirm(`Видалити ${filename}?`)) { closeTab(filename); } } const tabBtn = e.target.closest('.nav-link'); if (tabBtn) { switchTab(tabBtn.dataset.filename); } });
+    
     $('#runBtn').addEventListener('click', runCode);
     $('#fullscreenBtn').addEventListener('click', toggleFullScreen);
     $('#installPwaBtn').addEventListener('click', handleInstallClick);
     $('#emmetBtn').addEventListener('click', () => { if (editors[activeFile]) { editors[activeFile].execCommand('emmetExpandAbbreviation'); } });
-    document.addEventListener('fullscreenchange', () => { const isFullscreen = !!document.fullscreenElement; $('#icon-maximize').style.display = isFullscreen ? 'none' : 'block'; $('#icon-minimize').style.display = isFullscreen ? 'block' : 'none'; });
+    
     $('#newFileBtn').addEventListener('click', e => { e.preventDefault(); const filename = prompt("Введіть ім'я файлу:"); if (filename && filename.trim()) { if (editors[filename]) { alert("Файл з таким іменем вже існує."); return; } createTab(filename, ``, true); } });
-    $('#downloadZipBtn').addEventListener('click', e => { e.preventDefault(); /* exportToZip(); */ });
+    $('#downloadZipBtn').addEventListener('click', e => { e.preventDefault(); exportToZip(); });
     $('#saveToBrowserBtn').addEventListener('click', e => { e.preventDefault(); saveProject(); showToast('Проєкт збережено в браузер!'); });
-    $('#importZipInput').addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { /* loadProjectFromZip(file); */ } e.target.value = ''; });
+    $('#importZipInput').addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { loadProjectFromZip(file); } e.target.value = ''; });
+
     $('#wrapToggle').addEventListener('change', e => { wrapOption = e.target.checked; localStorage.setItem(LS_WRAP, wrapOption ? '1' : '0'); Object.values(editors).forEach(ed => ed.setOption('lineWrapping', wrapOption)); });
     $('#autoRefreshToggle').addEventListener('change', e => { autoRefreshEnabled = e.target.checked; localStorage.setItem(LS_AUTOREFRESH, autoRefreshEnabled ? '1' : '0'); });
     $('#offlineModeToggle').addEventListener('change', e => { offlineModeEnabled = e.target.checked; localStorage.setItem(LS_OFFLINE_MODE, offlineModeEnabled ? '1' : '0'); manageServiceWorker(); });
+    
     document.addEventListener('keydown', e => { if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); runCode(); } if (e.key === 'F11') { e.preventDefault(); toggleFullScreen(); } });
-    $('#consoleToggleBtn').addEventListener('click', () => { /* toggleConsole(); */ });
+    
+    $('#consoleToggleBtn').addEventListener('click', () => toggleConsole());
+    $('#clearLog').addEventListener('click', () => { logs.length = 0; $('#console').innerHTML = ''; logCount = 0; $('#cCount').textContent = '0'; $('#cDot').classList.remove('err'); });
+    $('#downloadLog').addEventListener('click', () => { const blob = new Blob([logs.map(l=>`[${l.level}] ${l.text}`).join('\n')], {type:'text/plain'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download='console.log'; a.click(); URL.revokeObjectURL(a.href); });
+    $('#copyLogBtn').addEventListener('click', copyLogToClipboard);
+    $('#execCmd').addEventListener('click', execCmd);
+    $('#consoleCmd').addEventListener('keydown', e => { if(e.key === 'Enter') execCmd(); else if (e.key==='ArrowUp') { if(cmdHistory.length){ histIdx = Math.max(0, (histIdx < 0 ? cmdHistory.length : histIdx) - 1); $('#consoleCmd').value = cmdHistory[histIdx]; e.preventDefault(); }} else if (e.key==='ArrowDown') { if(cmdHistory.length){ histIdx++; if(histIdx >= cmdHistory.length){ $('#consoleCmd').value = ''; histIdx = cmdHistory.length; } else { $('#consoleCmd').value = cmdHistory[histIdx]; } e.preventDefault(); }} });
+    window.addEventListener('message', e => { const d = e.data || {}; if(d.from !== 'editor') return; const level = (d.type || 'LOG').toUpperCase(); const text = Array.isArray(d.data) ? d.data.join(' ') : String(d.data || ''); pushLog(level, text); });
 });
 </script>
 
