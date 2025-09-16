@@ -1,857 +1,637 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Онлайн редактор</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Онлайн редактор кода</title>
+    <link rel="icon" href="./Ico.ico" type="image/x-icon">
 
-  <link rel="manifest" href="./manifest.json">
-  <meta name="theme-color" content="#1a1b26">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.css">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/theme/dracula.css">
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/xml/xml.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/css/css.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/javascript/javascript.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/mode/htmlmixed/htmlmixed.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/codemirror-emmet/emmet.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --bg-dark: #212529;
+            --bg-light: #282a36;
+            --border-color: #44475a;
+            --primary-color: #8be9fd;
+            --text-color: #f8f8f2;
+        }
+        html, body {
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-color);
+        }
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0.75rem;
+        }
+        .top-bar {
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+            background-color: var(--bg-dark);
+            padding-bottom: 0.5rem;
+        }
+        .nav-tabs {
+            flex-shrink: 0;
+            position: sticky;
+            top: 59px;
+            z-index: 1010;
+            background-color: var(--bg-dark);
+        }
+        .nav-tabs .nav-link {
+            background-color: transparent;
+            border-color: transparent;
+            color: var(--text-color);
+            position: relative;
+        }
+        .nav-tabs .nav-link.active {
+            background-color: var(--bg-light);
+            border-color: var(--border-color);
+            color: var(--primary-color);
+        }
+        .editor-container {
+            flex-grow: 1;
+            min-height: 0;
+            border: 1px solid var(--border-color);
+            border-radius: 0 0 0.375rem 0.375rem;
+        }
+        .CodeMirror {
+            height: 100%;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 14px;
+        }
+        #console {
+            width: 100%;
+            height: 100%;
+            background-color: #212121;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            padding: 10px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .modal-content {
+            background-color: var(--bg-light);
+            border: 1px solid var(--border-color);
+        }
+        .modal-header, .modal-footer {
+            border-color: var(--border-color);
+        }
+        .close-tab-btn {
+            position: absolute;
+            top: 50%;
+            right: 5px;
+            transform: translateY(-50%);
+            font-size: 0.7em;
+            color: #f8f8f2;
+            cursor: pointer;
+            line-height: 1;
+        }
 
-  <style>
-    :root {
-      --bg-primary: #1a1b26; --bg-secondary: #24283b; --bg-tertiary: #16161e;
-      --border-color: #414868; --text-primary: #c0caf5; --text-secondary: #a9b1d6;
-      --accent-primary: #7aa2f7; --accent-green: #9ece6a; --accent-red: #f7768e;
-      --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.2);
-    }
-    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-    body { background: var(--bg-primary); color: var(--text-primary); font-family: 'Inter', sans-serif; }
-    #app-container { display: flex; flex-direction: column; height: 100vh; }
-    .top-bar { padding: 6px 8px; flex-shrink: 0; display:flex; gap:6px; align-items:center; border-bottom: 1px solid var(--border-color); }
-    .btn-icon { background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; width: 34px; height: 34px; display:inline-flex; align-items:center; justify-content:center; transition: all 0.2s ease; box-shadow: var(--shadow-sm); }
-    .btn-icon:hover { background-color: #3b4261; border-color: #565f89; }
-    .btn-icon.run { background-color:var(--accent-primary); color:#fff; }
-    .btn-icon svg { width: 18px; height: 18px; }
-    #main-content { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
-    .nav-tabs { border-bottom: 2px solid var(--border-color); flex-shrink: 0; padding: 0 8px; }
-    .nav-tabs .nav-link { border: none; color: var(--text-secondary); margin-bottom: -2px; padding: 8px 12px; display: flex; align-items: center; gap: 8px; border-top-left-radius: 6px; border-top-right-radius: 6px; }
-    .nav-tabs .nav-link.active { background: var(--bg-tertiary); color: var(--accent-primary); border-top: 2px solid var(--accent-primary); font-weight: 500; }
-    .tab-close-btn { font-family: monospace; font-weight: bold; font-size: 16px; border-radius: 50%; width: 18px; height: 18px; display: flex; align-items: center; justify-content: center; line-height: 1; padding-bottom: 2px; cursor: pointer; transition: all 0.2s ease; }
-    #editor-panes { flex-grow: 1; position: relative; }
-    .tab-pane, .CodeMirror { height: 100%; width: 100%; }
-    #editor-panes .tab-pane { position: absolute; top: 0; left: 0; opacity: 0; visibility: hidden; transition: opacity 0.1s; }
-    #editor-panes .tab-pane.active { opacity: 1; visibility: visible; z-index: 1; }
-    #consoleWrap { position:fixed; bottom:0; left:0; right:0; background: var(--bg-tertiary); border-top: 1px solid var(--border-color); transition:height 0.2s ease; height:0; display:flex; flex-direction:column; overflow:hidden; z-index:9999; box-shadow: 0 -4px 15px rgba(0,0,0,0.3); }
-    .c-head { display:flex; align-items:center; justify-content:space-between; padding: 8px 12px; background: var(--bg-primary); cursor: ns-resize; user-select:none; touch-action:none; }
-    .btn-icon-sm { background-color: transparent; border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 6px; width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; transition: all 0.2s ease; }
-    .dropdown-menu, .modal-content { background-color: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; z-index: 10000; color: var(--text-primary); }
-    .dropdown-item { display: flex; align-items: center; gap: .5rem; color: var(--text-secondary); border-radius: 6px; padding: 8px 12px; }
-    #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 10001; }
-    .toast-message { background-color: var(--accent-green); color: var(--bg-tertiary); padding: 10px 16px; border-radius: 6px; font-weight: 500; box-shadow: var(--shadow-sm); opacity: 0; transition: opacity 0.3s ease; }
-    .pill-saving { display: inline-block; padding: 2px 8px; font-size: 10px; font-weight: 500; border-radius: 10px; background-color: var(--accent-primary); color: var(--bg-primary); margin-left: auto; opacity: 0.7; }
-    .pill-saving.dirty { animation: blink-animation 1.5s ease-in-out infinite; }
-    @keyframes blink-animation { 50% { opacity: 1; } }
-    .hidden { display: none !important; }
-    .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: var(--accent-green); margin-right: 6px; }
-    .dot.err { background-color: var(--accent-red); }
-    .console-input { display: flex; padding: 8px; border-top: 1px solid var(--border-color); background: var(--bg-secondary); }
-    .console-input input { flex-grow: 1; background: var(--bg-tertiary); border: 1px solid var(--border-color); color: var(--text-primary); padding: 6px 10px; border-radius: 4px 0 0 4px; outline: none; }
-    .console-input button { background: var(--accent-primary); color: white; border: none; padding: 0 12px; border-radius: 0 4px 4px 0; cursor: pointer; }
-    #console { flex-grow: 1; overflow-y: auto; padding: 8px; font-family: monospace; font-size: 13px; }
-    #console .line { margin-bottom: 4px; white-space: pre-wrap; }
-    #console .lvl { font-weight: bold; }
-    #console .lvl.ERROR { color: var(--accent-red); }
-    #console .lvl.WARN { color: #e0af68; }
-    #console .lvl.INFO { color: var(--accent-primary); }
-    #console .lvl.LOG { color: var(--text-secondary); }
-    
-    /* Fix for CodeMirror line numbers */
-    .CodeMirror-gutters {
-      background-color: var(--bg-tertiary) !important;
-      border-right: 1px solid var(--border-color) !important;
-    }
-    .CodeMirror-linenumber {
-      color: var(--text-secondary) !important;
-    }
-    .CodeMirror {
-      height: 100% !important;
-      font-family: 'Fira Code', 'Monaco', 'Cascadia Code', monospace !important;
-      font-size: 14px;
-    }
-    
-    /* Fix for tab layout */
-    .nav-tabs {
-      display: flex;
-      flex-wrap: nowrap;
-      overflow-x: auto;
-    }
-    .nav-tabs .nav-item {
-      flex-shrink: 0;
-    }
-  </style>
+        /* Медиа-запрос для адаптивности */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 0.5rem;
+            }
+            .top-bar {
+                padding-bottom: 0.25rem;
+                font-size: 0.8em;
+            }
+            .CodeMirror {
+                font-size: 12px;
+            }
+            .modal-dialog-centered {
+                margin: 0.5rem;
+            }
+            .modal-body .btn {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
 </head>
 <body>
 
-<div id="app-container">
-  <div class="top-bar">
-    <button class="btn-icon run" id="runBtn" title="Виконати (Ctrl+Enter)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg></button>
-    <button class="btn-icon" id="consoleToggleBtn" title="Консоль"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg></button>
-    <button class="btn-icon hidden" id="installPwaBtn" title="Встановити додаток">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
-    </button>
-    <button class="btn-icon" id="fullscreenBtn" title="На весь екран (F11)">
-        <svg id="icon-maximize" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
-        <svg id="icon-minimize" style="display:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"></path></svg>
-    </button>
-    <button class="btn-icon hidden" id="emmetBtn" title="Застосувати Emmet">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline><polyline points="17 18 23 18 23 12"></polyline></svg>
-    </button>
-    <div class="dropdown">
-      <button class="btn-icon" type="button" data-bs-toggle="dropdown" title="Меню"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
-      <ul class="dropdown-menu">
-        <li><a class="dropdown-item" href="#" id="newFileBtn">➕ Новий файл</a></li>
-        <li>
-            <label class="dropdown-item" for="importZipInput" style="cursor: pointer;">📂 Відкрити проєкт</label>
-            <input type="file" id="importZipInput" hidden accept=".zip">
-        </li>
-        <li><a class="dropdown-item" href="#" id="saveToBrowserBtn">💾 Зберегти в браузер <span id="savingPill" class="pill-saving" style="display: none;">збереження...</span></a></li>
-        <li><a class="dropdown-item" href="#" id="downloadZipBtn">📦 Завантажити як ZIP</a></li>
-        <li><hr class="dropdown-divider" style="border-color: var(--border-color);"></li>
-        <li><label class="dropdown-item"><input type="checkbox" id="autoRefreshToggle" class="form-check-input"> Автооновлення</label></li>
-        <li><label class="dropdown-item"><input type="checkbox" id="wrapToggle" class="form-check-input"> Перенос по словам</label></li>
-        <li><label class="dropdown-item"><input type="checkbox" id="offlineModeToggle" class="form-check-input"> 🛜 Офлайн-режим</label></li>
-        <li><hr class="dropdown-divider" style="border-color: var(--border-color);"></li>
-        <li><a class="dropdown-item" href="https://docs.emmet.io/cheat-sheet/" target="_blank" rel="noopener noreferrer">📖 Інструкція Emmet</a></li>
-        <li><a class="dropdown-item" href="#" id="mLibs">📚 Бібліотеки</a></li>
-      </ul>
-    </div>
-  </div>
+<div class="main-container">
 
-  <div id="main-content">
-    <ul class="nav nav-tabs" id="editor-tabs"></ul>
-    <div class="tab-content" id="editor-panes"></div>
-  </div>
+
+    <ul class="nav nav-tabs" id="editorTabs" role="tablist">
+        <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#html-panel" type="button" role="tab">HTML</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#css-panel" type="button" role="tab">CSS</button></li>
+        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#js-panel" type="button" role="tab">JavaScript</button></li>
+    </ul>
+
+    <div class="editor-container tab-content">
+        <div class="tab-pane fade show active h-100" id="html-panel" role="tabpanel"><div id="htmlEditor"></div></div>
+        <div class="tab-pane fade h-100" id="css-panel" role="tabpanel"><div id="cssEditor"></div></div>
+        <div class="tab-pane fade h-100" id="js-panel" role="tabpanel"><div id="jsEditor"></div></div>
+    </div>
 </div>
 
-<div id="consoleWrap">
-  <div class="c-head" id="consoleDrag">
-    <div class="title"><div id="cDot" class="dot"></div> <span>Консоль (<span id="cCount">0</span>)</span></div>
-    <div class="d-flex gap-1">
-      <button class="btn-icon-sm" id="copyLogBtn" title="Копіювати лог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
-      <button class="btn-icon-sm" id="downloadLog" title="Завантажити лог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
-      <button class="btn-icon-sm" id="clearLog" title="Очистити лог"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-tools"></i> Настройки и Инструменты</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="p-3 border rounded" style="background-color: var(--bg-dark);">
+                    <h6 class="mb-3"><i class="bi bi-link-45deg"></i> Подключение библиотек</h6>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-sm-5"><input type="url" class="form-control form-control-sm" id="libUrl" placeholder="URL библиотеки..."></div>
+                        <div class="col-sm-3"><select class="form-select form-select-sm" id="libPosition"><option value="head" selected>В &lt;head&gt;</option><option value="body">В &lt;body&gt;</option></select></div>
+                        <div class="col-sm-3"><input type="text" class="form-control form-control-sm" id="libAttributes" placeholder="Атрибуты (defer)"></div>
+                        <div class="col-sm-1"><button class="btn btn-sm btn-success w-100" onclick="addLibrary()">+</button></div>
+                    </div>
+                    <div id="libraryList" class="mt-3 d-flex flex-wrap gap-2"></div>
+                </div>
+                <div class="p-3 mt-3 border rounded" style="background-color: var(--bg-dark);">
+                    <h6 class="mb-3"><i class="bi bi-code-slash"></i> Добавление вкладок</h6>
+                    <div class="row g-2 align-items-center">
+                        <div class="col-sm-6">
+                            <select class="form-select form-select-sm" id="tabType">
+                                <option value="html">HTML</option>
+                                <option value="css">CSS</option>
+                                <option value="js">JavaScript</option>
+                                <option value="json">JSON</option>
+                                <option value="txt">Text</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-6"><button class="btn btn-sm btn-success w-100" onclick="addEditorTab()">Добавить вкладку</button></div>
+                    </div>
+                </div>
+                <div class="p-3 mt-3 border rounded" style="background-color: var(--bg-dark);">
+                    <h6 class="mb-3"><i class="bi bi-image"></i> Favicon</h6>
+                    <div id="faviconDisplay" class="mb-2 d-inline-flex align-items-center" style="display: none !important;">
+                        <img id="faviconPreview" src="" alt="icon" style="width: 16px; height: 16px; margin-right: 8px;">
+                        <span id="faviconInfo" class="text-white-50 small"></span>
+                        <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeFavicon()"></button>
+                    </div>
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="url" class="form-control" id="faviconUrl" placeholder="URL иконки..."><button class="btn btn-outline-secondary" type="button" onclick="setFaviconFromUrl()">Установить</button>
+                    </div>
+                    <div class="input-group input-group-sm">
+                        <input type="file" class="form-control" id="faviconFile" accept="image/*" onchange="setFaviconFromFile(event)">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmClearCode()"><i class="bi bi-trash"></i> Очистить проект</button>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="trimWhitespaceCheckbox"><label class="form-check-label" for="trimWhitespaceCheckbox">Очистить пробелы</label>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  <div id="console"></div>
-  <div class="console-input">
-    <input id="consoleCmd" placeholder="Введіть JS команду..."><button id="execCmd">▶</button>
-  </div>
 </div>
-<div id="toast-container"></div>
-<div class="modal fade" id="libsModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">📚 Менеджер бібліотек</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1);"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">Додати бібліотеку (URL)</label>
-          <div class="input-group">
-            <input type="text" class="form-control" id="libUrl" placeholder="https://cdn.example.com/library.js">
-            <button class="btn btn-primary" id="addLibBtn">Додати</button>
-          </div>
-          <div class="form-text">Введіть URL CSS або JS бібліотеки</div>
+
+<div class="modal fade" id="contextMenuModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-0">
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-0 d-flex flex-column gap-2">
+                <button class="btn btn-primary d-flex align-items-center gap-2" onclick="runCode()" data-bs-dismiss="modal"><i class="bi bi-play-fill"></i> Выполнить</button>
+                <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="showSettingsModal()" data-bs-dismiss="modal"><i class="bi bi-gear-fill"></i> Настройки</button>
+                
+                <hr class="my-2" style="border-color: var(--border-color);">
+                <button class="btn btn-success d-flex align-items-center gap-2" onclick="saveCode()" data-bs-dismiss="modal"><i class="bi bi-download"></i> Сохранить .html</button>
+                <button class="btn btn-success d-flex align-items-center gap-2" onclick="saveZip()" data-bs-dismiss="modal"><i class="bi bi-file-earmark-zip"></i> Сохранить .zip</button>
+                <button class="btn btn-warning d-flex align-items-center gap-2" onclick="showConsoleModal()" data-bs-dismiss="modal"><i class="bi bi-terminal"></i> Консоль</button>
+                <label class="btn btn-info mb-0 d-flex align-items-center gap-2" for="importFile2"><i class="bi bi-folder2-open"></i> Импорт</label>
+                <input type="file" id="importFile2" accept=".html" onchange="importFile(event); closeModal('contextMenuModal');" hidden>
+            </div>
         </div>
-        <div class="mt-3">
-          <h6>Активні бібліотеки</h6>
-          <div id="libsList"></div>
-        </div>
-      </div>
     </div>
-  </div>
+</div>
+
+<div class="modal fade" id="consoleModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-terminal"></i> Консоль</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="console"></div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between">
+                <button type="button" class="btn btn-success btn-sm" onclick="copyConsoleToClipboard()"><i class="bi bi-clipboard-plus"></i> Сохранить в буфер</button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="clearConsole()"><i class="bi bi-trash"></i> Очистить</button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
 <script>
-// ===== STATE & CONSTANTS =====
-const LS_PROJECT = 'editor_project_v15_files';
-const LS_LIBS = 'editor_libs_v1';
-const LS_WRAP = 'wrap_pref_v2';
-const LS_AUTOREFRESH = 'auto_refresh_pref_v1';
-const LS_OFFLINE_MODE = 'offline_mode_v1';
-const $ = s => document.querySelector(s);
-const $$ = s => document.querySelectorAll(s);
-
-let editors = {}; let projectFiles = []; let libs = []; let activeFile = ''; let runWin = null;
-let wrapOption = false; let autoRefreshEnabled = false; let offlineModeEnabled = false;
-let deferredPrompt;
-const logs = []; let logCount = 0; const cmdHistory = []; let histIdx = -1;
-
-// ===== HELPERS =====
-const getEditorMode = (filename) => { const ext = (filename.split('.').pop() || '').toLowerCase(); if (ext === 'js') return 'javascript'; if (ext === 'css') return 'css'; if (ext === 'html' || ext === 'htm') return 'htmlmixed'; return 'text/plain'; };
-const debounce = (fn, ms = 1500) => { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }; };
-const safeScript = s => String(s).replace(/<\/script>/gi, '<\\/script>');
-function showToast(message) {
-    const container = $('#toast-container');
-    const toast = document.createElement('div');
-    toast.className = 'toast-message';
-    toast.textContent = message;
-    container.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = 1; }, 10);
-    setTimeout(() => { toast.style.opacity = 0; setTimeout(() => toast.remove(), 300); }, 2000);
-}
-function setSavingPill(isDirty) {
-    const pill = $('#savingPill');
-    if (isDirty) {
-        pill.style.display = 'inline-block';
-        pill.classList.add('dirty');
-    } else {
-        pill.style.display = 'none';
-        pill.classList.remove('dirty');
-    }
-}
-function updateContextualUI(filename) {
-    const mode = getEditorMode(filename);
-    const emmetBtn = $('#emmetBtn');
-    if (mode === 'htmlmixed' || mode === 'css') {
-        emmetBtn.classList.remove('hidden');
-    } else {
-        emmetBtn.classList.add('hidden');
-    }
-}
-
-// ===== LIBRARY MANAGEMENT =====
-function loadLibs() { 
-  try { 
-    const savedLibs = localStorage.getItem(LS_LIBS);
-    return savedLibs ? JSON.parse(savedLibs) : []; 
-  } catch(e) { 
-    console.error("Помилка завантаження бібліотек:", e);
-    return []; 
-  } 
-}
-
-function saveLibs() { 
-  try {
-    localStorage.setItem(LS_LIBS, JSON.stringify(libs)); 
-  } catch(e) {
-    console.error("Помилка збереження бібліотек:", e);
-  }
-}
-
-function buildLibTags() { 
-  return libs.filter(l => l.enabled).map(l => { 
-    const u = (l.url || '').trim().toLowerCase(); 
-    return u.endsWith('.css') ? 
-      `<link rel="stylesheet" href="${l.url}">` : 
-      `<script src="${l.url}"><\/script>`; 
-  }).join(''); 
-}
-
-function renderLibsList() {
-  const libsList = $('#libsList');
-  if (!libsList) return;
-  
-  libsList.innerHTML = '';
-  
-  if (libs.length === 0) {
-    libsList.innerHTML = '<div class="text-center py-3 text-muted">Немає доданих бібліотек</div>';
-    return;
-  }
-  
-  libs.forEach((lib, index) => {
-    const libItem = document.createElement('div');
-    libItem.className = 'lib-item d-flex align-items-center justify-content-between py-2 border-bottom';
-    libItem.innerHTML = `
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="lib-${index}" ${lib.enabled ? 'checked' : ''}>
-        <label class="form-check-label" for="lib-${index}" title="${lib.url}">
-          ${lib.url.length > 40 ? lib.url.substring(0, 40) + '...' : lib.url}
-        </label>
-      </div>
-      <button class="btn btn-sm btn-danger lib-remove" data-index="${index}">×</button>
-    `;
-    libsList.appendChild(libItem);
-  });
-  
-  // Add event listeners
-  $$('.lib-item input').forEach((checkbox, index) => {
-    checkbox.addEventListener('change', (e) => {
-      libs[index].enabled = e.target.checked;
-      saveLibs();
-      showToast('Налаштування збережено');
-    });
-  });
-  
-  $$('.lib-remove').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const index = parseInt(e.target.dataset.index);
-      libs.splice(index, 1);
-      saveLibs();
-      renderLibsList();
-      showToast('Бібліотеку видалено');
-    });
-  });
-}
-
-// ===== CORE FILE & TAB MANAGEMENT =====
-function createTab(filename, content = '', isActive = false) {
-    if (editors[filename]) { switchTab(filename); return; }
-    const paneId = `pane-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const tabContainer = $('#editor-tabs');
-    const tab = document.createElement('li'); tab.className = 'nav-item';
-    const isProtected = filename === 'index.html';
-    tab.innerHTML = `<button class="nav-link ${isActive ? 'active' : ''}" data-bs-toggle="tab" data-bs-target="#${paneId}" type="button" role="tab" data-filename="${filename}">${filename}${!isProtected ? `<span class="tab-close-btn" data-filename="${filename}">&times;</span>` : ''}</button>`;
-    tabContainer.appendChild(tab);
-    
-    const paneContainer = $('#editor-panes');
-    const pane = document.createElement('div');
-    pane.className = `tab-pane fade ${isActive ? 'show active' : ''}`; pane.id = paneId;
-    const textarea = document.createElement('textarea'); 
-    textarea.className = 'editor-textarea';
-    pane.appendChild(textarea);
-    paneContainer.appendChild(pane);
-
-    const mode = getEditorMode(filename);
-    const editorOptions = { 
-      lineNumbers: true, 
-      mode: mode, 
-      theme: 'dracula', 
-      lineWrapping: wrapOption,
-      indentUnit: 2,
-      tabSize: 2,
-      indentWithTabs: false,
-      electricChars: true,
-      autoCloseBrackets: true,
-      matchBrackets: true,
-      autoCloseTags: true
+    const commonConfig = {
+        lineNumbers: true,
+        theme: 'dracula',
+        lineWrapping: true,
+        autofocus: true,
+        autoCloseBrackets: true
     };
-    
-    if (mode === 'htmlmixed' || mode === 'css') {
-        editorOptions.extraKeys = { 
-          'Tab': 'emmetExpandAbbreviation', 
-          'Enter': 'emmetInsertLineBreak',
-          'Ctrl-Space': 'autocomplete'
-        };
+
+    const editors = {
+        html: CodeMirror(document.getElementById('htmlEditor'), { ...commonConfig, mode: 'xml', extraKeys: {"Ctrl-Enter": runCode} }),
+        css: CodeMirror(document.getElementById('cssEditor'), { ...commonConfig, mode: 'css', extraKeys: {"Ctrl-Enter": runCode} }),
+        js: CodeMirror(document.getElementById('jsEditor'), { ...commonConfig, mode: 'javascript', extraKeys: {"Ctrl-Enter": runCode} })
+    };
+
+    document.addEventListener('keydown', (e) => {
+        if (e.ctrlKey && e.key === 'Enter') {
+            e.preventDefault();
+            runCode();
+        }
+    });
+
+    document.addEventListener('dblclick', (e) => {
+        const modal = new bootstrap.Modal(document.getElementById('contextMenuModal'));
+        modal.show();
+    });
+
+    let libraries = [];
+    let faviconHref = '';
+    const consoleElement = document.getElementById('console');
+    const libraryListElement = document.getElementById('libraryList');
+    const faviconDisplayElement = document.getElementById('faviconDisplay');
+    const faviconPreviewElement = document.getElementById('faviconPreview');
+    const faviconInfoElement = document.getElementById('faviconInfo');
+    const faviconUrlInput = document.getElementById('faviconUrl');
+    const faviconFileInput = document.getElementById('faviconFile');
+    const editorTabsList = document.getElementById('editorTabs');
+    const editorPanels = document.querySelector('.editor-container');
+    let tabCount = 0;
+
+    function setFaviconFromUrl() {
+        const url = faviconUrlInput.value.trim();
+        if (url) {
+            faviconHref = url;
+            updateFaviconDisplay(url, "URL");
+        }
     }
 
-    const editor = CodeMirror.fromTextArea(textarea, editorOptions);
-    editor.setValue(content);
-    editor.on('change', () => { 
-      markDirty(); 
-      if (autoRefreshEnabled && runWin && !runWin.closed) { 
-        debouncedRefresh(); 
-      } 
-    });
-    
-    editors[filename] = editor;
-    if (!projectFiles.some(f => f.name === filename)) { 
-      projectFiles.push({ name: filename, content }); 
+    function setFaviconFromFile(event) {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                faviconHref = e.target.result;
+                updateFaviconDisplay(faviconHref, file.name);
+            };
+            reader.readAsDataURL(file);
+        }
     }
-    if (isActive) { 
-      activeFile = filename; 
-      updateContextualUI(filename); 
+
+    function removeFavicon() {
+        faviconHref = '';
+        faviconDisplayElement.style.display = "none";
+        faviconUrlInput.value = '';
+        faviconFileInput.value = '';
     }
-    
-    // Refresh editor after a short delay to ensure proper rendering
-    setTimeout(() => editor.refresh(), 100);
-}
-function switchTab(filename) { 
-    const tabButton = $(`button[data-filename="${filename}"]`); 
-    if (tabButton) { 
-        const tabInstance = new bootstrap.Tab(tabButton);
-        tabInstance.show();
-        activeFile = filename; 
-        updateContextualUI(filename);
-        setTimeout(() => {
-          if (editors[filename]) {
-            editors[filename].refresh();
-            editors[filename].focus();
-          }
-        }, 50); 
-    } 
-}
-function closeTab(filename) { 
-    if (filename === 'index.html') return; 
-    
-    // Find and remove tab
-    const tabElement = $(`button[data-filename="${filename}"]`).closest('.nav-item');
-    if (tabElement) tabElement.remove();
-    
-    // Find and remove pane
-    const paneId = `pane-${filename.replace(/[^a-zA-Z0-9]/g, '_')}`;
-    const paneElement = $(`#${paneId}`);
-    if (paneElement) paneElement.remove();
-    
-    // Clean up references
-    delete editors[filename]; 
-    projectFiles = projectFiles.filter(f => f.name !== filename); 
-    
-    // Switch to another tab if we closed the active one
-    if (activeFile === filename) {
-        const remainingFiles = Object.keys(editors);
-        if (remainingFiles.length > 0) {
-            switchTab(remainingFiles[0]);
+
+    function updateFaviconDisplay(href, info) {
+        faviconPreviewElement.src = href;
+        faviconInfoElement.textContent = info;
+        faviconDisplayElement.style.display = "inline-flex";
+    }
+
+    function addLibrary() {
+        const url = document.getElementById("libUrl").value.trim();
+        if (url) {
+            libraries.push({
+                url: url,
+                position: document.getElementById("libPosition").value,
+                attributes: document.getElementById("libAttributes").value.trim()
+            });
+            updateLibraryList();
+            document.getElementById("libUrl").value = "";
+            document.getElementById("libAttributes").value = "";
         } else {
-            activeFile = '';
+            alert("Пожалуйста, введите URL библиотеки.");
         }
     }
-    
-    markDirty(); 
-}
-function resetUI() { 
-    $('#editor-tabs').innerHTML = ''; 
-    $('#editor-panes').innerHTML = ''; 
-    editors = {}; 
-    projectFiles = []; 
-}
 
-// ===== PROJECT SAVE/LOAD & OFFLINE =====
-let dirty = false;
-function markDirty() { dirty = true; setSavingPill(true); debouncedSave(); }
-const saveProject = () => { 
-    projectFiles.forEach(file => { 
-        if (editors[file.name]) { 
-            file.content = editors[file.name].getValue(); 
-        } 
-    }); 
-    try {
-        localStorage.setItem(LS_PROJECT, JSON.stringify(projectFiles)); 
-        dirty = false; 
-        setSavingPill(false);
-    } catch(e) {
-        console.error("Помилка збереження проекту:", e);
-        showToast("Помилка збереження!");
+    function updateLibraryList() {
+        libraryListElement.innerHTML = "";
+        libraries.forEach((lib, index) => {
+            const span = document.createElement("span");
+            span.className = "badge bg-secondary d-flex align-items-center";
+            span.innerHTML = `${lib.url} (${lib.position}) <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeLibrary(${index})" aria-label="Удалить"></button>`;
+            libraryListElement.appendChild(span);
+        });
     }
-};
-const debouncedSave = debounce(saveProject, 1500);
-function loadProject() {
-    const savedData = localStorage.getItem(LS_PROJECT);
-    if (savedData) { 
-        try { 
-            projectFiles = JSON.parse(savedData); 
-            if (!projectFiles.some(f => f.name === 'index.html')) throw new Error("No index.html"); 
-        } catch { 
-            projectFiles = []; 
-        } 
+
+    function removeLibrary(index) {
+        libraries.splice(index, 1);
+        updateLibraryList();
     }
-    if (projectFiles.length === 0) {
-        projectFiles = [
-            { name: 'index.html', content: '<!DOCTYPE html>\n<html>\n<head>\n  <meta charset="UTF-8">\n  <title>Мій проект</title>\n</head>\n<body>\n  <h1>Hello, Emmet!</h1>\n  <p>Try typing `p*3>lorem5` and pressing Tab or the ⚡️ button.</p>\n</body>\n</html>' },
-            { name: 'style.css', content: 'body { \n  font-family: sans-serif; \n  padding: 1rem; \n  background: #1a1b26;\n  color: #c0caf5;\n}' },
-            { name: 'script.js', content: 'console.log("Welcome!");' }
-        ];
+
+    function showSettingsModal() {
+        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
+        modal.show();
     }
-    resetUI();
-    projectFiles.forEach((file, index) => createTab(file.name, file.content, index === 0));
-}
-function exportToZip() { 
-    saveProject(); 
-    const zip = new JSZip(); 
-    projectFiles.forEach(file => { 
-        zip.file(file.name, file.content); 
-    }); 
-    zip.generateAsync({type:"blob"}).then(blob => { 
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(blob); 
-        a.download = 'project.zip'; 
-        a.click(); 
-        URL.revokeObjectURL(a.href); 
-    }).catch(e => {
-        console.error("Помилка створення ZIP:", e);
-        showToast("Помилка створення архіву!");
-    }); 
-}
-async function loadProjectFromZip(file) {
-    if (!file) return;
-    try {
-        const zip = await JSZip.loadAsync(file);
-        const newProjectFiles = [];
-        const promises = [];
-        zip.forEach((relativePath, zipEntry) => {
-            if (!zipEntry.dir) {
-                const promise = zipEntry.async("string").then(content => { 
-                    newProjectFiles.push({ name: relativePath, content: content }); 
-                });
-                promises.push(promise);
+    
+    function showConsoleModal() {
+        const modal = new bootstrap.Modal(document.getElementById('consoleModal'));
+        modal.show();
+    }
+    
+    function clearConsole() {
+        consoleElement.innerHTML = '';
+    }
+    
+    function copyConsoleToClipboard() {
+        const textToCopy = consoleElement.innerText;
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            alert('Лог скопирован в буфер обмена!');
+        }).catch(err => {
+            console.error('Не удалось скопировать текст: ', err);
+            alert('Ошибка при копировании лога.');
+        });
+    }
+
+    function addEditorTab() {
+        const tabType = document.getElementById('tabType').value;
+        const tabName = prompt(`Введите имя для новой вкладки (${tabType}):`, `untitled${++tabCount}.${tabType}`);
+        if (!tabName) return;
+
+        const tabId = `tab-${tabType}-${tabName.replace(/\./g, '-')}-${Date.now()}`;
+        const mode = getModeForType(tabType);
+        
+        const tabItem = document.createElement('li');
+        tabItem.className = 'nav-item';
+        tabItem.role = 'presentation';
+        tabItem.innerHTML = `<button class="nav-link" data-bs-toggle="tab" data-bs-target="#${tabId}-panel" type="button" role="tab">${tabName}<span class="close-tab-btn" onclick="removeEditorTab(event, '${tabId}')">&times;</span></button>`;
+        editorTabsList.appendChild(tabItem);
+
+        const tabPanel = document.createElement('div');
+        tabPanel.className = 'tab-pane fade h-100';
+        tabPanel.id = `${tabId}-panel`;
+        tabPanel.role = 'tabpanel';
+        tabPanel.innerHTML = `<div id="${tabId}-editor"></div>`;
+        editorPanels.appendChild(tabPanel);
+        
+        editors[tabId] = CodeMirror(document.getElementById(`${tabId}-editor`), { ...commonConfig, mode: mode, extraKeys: {"Ctrl-Enter": runCode} });
+
+        const newTab = new bootstrap.Tab(tabItem.querySelector('.nav-link'));
+        newTab.show();
+    }
+
+    function removeEditorTab(event, tabId) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        const tabItem = event.target.closest('.nav-item');
+        const tabPanel = document.getElementById(`${tabId}-panel`);
+
+        if (tabItem && tabPanel) {
+            tabItem.remove();
+            tabPanel.remove();
+            delete editors[tabId];
+            
+            const firstTab = editorTabsList.querySelector('.nav-item:first-child .nav-link');
+            if (firstTab) {
+                new bootstrap.Tab(firstTab).show();
             }
-        });
-        await Promise.all(promises);
-        if (!newProjectFiles.some(f => f.name === 'index.html')) { 
-            alert('Помилка: ZIP-архів має містити файл index.html'); 
-            return; 
         }
-        newProjectFiles.sort((a, b) => { 
-            if (a.name === 'index.html') return -1; 
-            if (b.name === 'index.html') return 1; 
-            return a.name.localeCompare(b.name); 
-        });
-        resetUI();
-        projectFiles = newProjectFiles;
-        projectFiles.forEach((f, index) => createTab(f.name, f.content, index === 0));
-        saveProject();
-        showToast('Проєкт успішно завантажено!');
-    } catch (e) {
-        alert('Не вдалося прочитати ZIP-архів.');
-        console.error(e);
     }
-}
 
-// ===== CONSOLE LOGIC =====
-function toggleConsole(h = 220) { 
-    const wrap = $('#consoleWrap'); 
-    wrap.style.height = (parseInt(wrap.style.height || '0', 10) > 0) ? '0px' : (h + 'px'); 
-}
-function pushLog(level, text) { 
-    logs.push({level, text}); 
-    const box = $('#console'); 
-    if(parseInt($('#consoleWrap').style.height||'0',10)>0) { 
-        const line = document.createElement('div'); 
-        line.className = 'line'; 
-        line.innerHTML = `<span class="lvl ${level.toUpperCase()}">${level.toUpperCase()}:</span> ${text}`; 
-        box.appendChild(line); 
-        box.scrollTop = box.scrollHeight; 
-    } 
-    logCount++; 
-    $('#cCount').textContent = String(logCount); 
-    $('#cDot').className = level.toUpperCase() === 'ERROR' ? 'dot err' : 'dot';
-}
-function execCmd() { 
-    const cmd = $('#consoleCmd').value; 
-    if(!cmd.trim()) return; 
-    cmdHistory.push(cmd); 
-    histIdx = -1; 
-    if(runWin && runWin.execFromParent){ 
-        try {
-            runWin.execFromParent(cmd); 
-        } catch(e) {
-            pushLog('ERROR', 'Помилка виконання команди: ' + e.message);
+    function getModeForType(type) {
+        switch (type) {
+            case 'html':
+                return 'xml';
+            case 'css':
+                return 'css';
+            case 'js':
+                return 'javascript';
+            case 'json':
+                return { name: 'javascript', json: true };
+            case 'txt':
+                return null;
+            default:
+                return 'xml';
         }
-    } else { 
-        pushLog('ERROR','Вікно попереднього перегляду не запущено'); 
-    } 
-    $('#consoleCmd').value=''; 
-}
-function copyLogToClipboard() { 
-    if (logs.length === 0) { 
-        showToast("Консоль порожня"); 
-        return; 
-    } 
-    const logText = logs.map(l => `[${l.level}] ${l.text}`).join('\n'); 
-    navigator.clipboard.writeText(logText).then(() => { 
-        showToast("Лог скопійовано!"); 
-    }).catch(() => { 
-        showToast("Помилка копіювання"); 
-    }); 
-}
-(function enableConsoleDrag(){ 
-    const drag = $('#consoleDrag'), wrap = $('#consoleWrap'); 
-    let startY=0, startH=0, dragging=false; 
-    const onMove = y => { 
-        let nh = Math.max(100, Math.min(window.innerHeight*0.9, startH + (startY - y))); 
-        wrap.style.height = nh+'px'; 
-    }; 
-    drag.addEventListener('mousedown', e => { 
-        dragging=true; 
-        startY=e.clientY; 
-        startH=parseInt(getComputedStyle(wrap).height,10)||0; 
-    }); 
-    window.addEventListener('mousemove', e => { 
-        if(dragging) onMove(e.clientY); 
-    }); 
-    window.addEventListener('mouseup', () => { 
-        dragging=false; 
-    }); 
-    drag.addEventListener('touchstart', e => { 
-        dragging=true; 
-        startY=e.touches[0].clientY; 
-        startH=parseInt(getComputedStyle(wrap).height,10)||0; 
-    }, {passive: true}); 
-    window.addEventListener('touchmove', e => { 
-        if(dragging) onMove(e.touches[0].clientY); 
-    }, {passive: true}); 
-    window.addEventListener('touchend', () => { 
-        dragging=false; 
-    }); 
-})();
-
-// ===== PWA & SERVICE WORKER =====
-function manageServiceWorker() {
-    if (!('serviceWorker' in navigator)) { 
-        console.log('Service Worker не підтримується');
-        return; 
     }
-    
-    if (offlineModeEnabled) {
-        navigator.serviceWorker.getRegistration().then(reg => {
-            if (!reg) { 
-                // Simple service worker for offline
-                const swContent = `
-                self.addEventListener('install', event => {
-                    event.waitUntil(self.skipWaiting());
-                });
-                self.addEventListener('fetch', event => {
-                    event.respondWith(
-                        caches.match(event.request).then(response => {
-                            return response || fetch(event.request);
-                        })
-                    );
-                });
-                `;
+
+    function runCode() {
+        const trimWhitespace = document.getElementById("trimWhitespaceCheckbox").checked;
+        let htmlCode = editors.html.getValue();
+        let cssCode = editors.css.getValue();
+        let jsCode = editors.js.getValue();
+        
+        if (trimWhitespace) {
+            htmlCode = htmlCode.trim();
+            cssCode = cssCode.trim();
+            jsCode = jsCode.trim();
+        }
+
+        for (const key in editors) {
+            if (key.startsWith('tab-')) {
+                const parts = key.split('-');
+                const editorType = parts[1];
                 
-                const blob = new Blob([swContent], {type: 'application/javascript'});
-                const swUrl = URL.createObjectURL(blob);
-                
-                navigator.serviceWorker.register(swUrl)
-                    .then(reg => console.log('Service Worker registered'))
-                    .catch(err => console.error('SW Registration Error:', err));
+                if (editorType === 'css') {
+                    cssCode += `\n${editors[key].getValue()}`;
+                } else if (editorType === 'js') {
+                    jsCode += `\n${editors[key].getValue()}`;
+                }
+            }
+        }
+
+        const headLibraries = libraries
+            .filter(lib => lib.position === "head")
+            .map(lib => `<script src="${lib.url}" ${lib.attributes}><\/script>`).join("");
+        
+        const bodyLibraries = libraries
+            .filter(lib => lib.position === "body")
+            .map(lib => `<script src="${lib.url}" ${lib.attributes}><\/script>`).join("");
+
+        const consoleScript = `
+            <script>
+                const _log = (type, args) => {
+                    try {
+                        const message = Array.from(args).map(arg => {
+                            return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg);
+                        });
+                        window.opener?.postMessage({ type: type, message: message.join(" ") }, "*");
+                    } catch (e) {
+                        // ignore
+                    }
+                };
+                window.console.log = (...args) => _log("log", args);
+                window.console.error = (...args) => _log("error", args);
+                window.console.warn = (...args) => _log("warn", args);
+                window.addEventListener("error", (e) => _log("error", [e.message]));
+            <\/script>
+        `;
+
+        const jsExecutionScript = `<script>try { ${jsCode} } catch(e) { console.error(e.message); }<\/script>`;
+        const faviconLink = faviconHref ? `<link rel="icon" href="${faviconHref}">` : "";
+
+        const newWindow = window.open();
+        if (newWindow) {
+            newWindow.document.write(`<!DOCTYPE html><html><head>${faviconLink}${consoleScript}<style>${cssCode}</style>${headLibraries}</head><body>${htmlCode}${bodyLibraries}${jsExecutionScript}</body></html>`);
+            newWindow.document.close();
+        } else {
+            alert("Браузер заблокировал всплывающее окно.");
+        }
+    }
+
+    window.addEventListener("message", (event) => {
+        if (!event.data || typeof event.data.message === 'undefined') return;
+        
+        const { type, message } = event.data;
+        let color = "#8be9fd";
+        let label = "LOG";
+        
+        if (type === "error") {
+            color = "#ff5555";
+            label = "ERR";
+        } else if (type === "warn") {
+            color = "#f1fa8c";
+            label = "WARN";
+        }
+
+        const logItem = document.createElement("div");
+        logItem.textContent = `[${label}] ${message}`;
+        logItem.style.cssText = `color: ${color}; border-bottom: 1px solid #333; padding: 2px 5px;`;
+        consoleElement.appendChild(logItem);
+        
+        const consoleModal = bootstrap.Modal.getInstance(document.getElementById('consoleModal'));
+        if (!consoleModal) {
+            showConsoleModal();
+        }
+        
+        consoleElement.scrollTop = consoleElement.scrollHeight;
+    });
+
+    function toggleConsole() {
+        consoleElement.style.display = (consoleElement.style.display === "none" || consoleElement.style.display === "") ? "block" : "none";
+    }
+
+    function confirmClearCode() {
+        if (confirm("Вы уверены, что хотите очистить весь проект? Это действие нельзя отменить.")) {
+            clearCode();
+        }
+    }
+    
+    function clearCode() {
+        for (const key in editors) {
+            editors[key].setValue('');
+        }
+        
+        const dynamicTabs = editorTabsList.querySelectorAll('.nav-item:not(:first-child):not(:nth-child(2)):not(:nth-child(3))');
+        dynamicTabs.forEach(tab => {
+            const tabId = tab.querySelector('button').dataset.bsTarget.slice(1).replace('-panel', '');
+            document.getElementById(`${tabId}-panel`).remove();
+            tab.remove();
+            delete editors[tabId];
+        });
+
+        libraries = [];
+        updateLibraryList();
+        
+        faviconHref = '';
+        removeFavicon();
+        
+        alert("Проект очищен!");
+    }
+
+    function saveCode() {
+        const fullCode = `<!DOCTYPE html>
+<html>
+<head>
+    <style>${editors.css.getValue()}</style>
+</head>
+<body>
+    ${editors.html.getValue()}
+    <script>${editors.js.getValue()}<\/script>
+</body>
+</html>`;
+        
+        const blob = new Blob([fullCode], { type: "text/html" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "index.html";
+        a.click();
+    }
+    
+    function saveZip() {
+        const zip = new JSZip();
+
+        // Сохраняем все вкладки
+        const tabItems = editorTabsList.querySelectorAll('.nav-link');
+        tabItems.forEach(tab => {
+            const tabId = tab.dataset.bsTarget.slice(1).replace('-panel', '');
+            const editorInstance = editors[tabId];
+            if (editorInstance) {
+                const tabName = tab.textContent.replace('×', '').trim();
+                zip.file(tabName, editorInstance.getValue());
             }
         });
-    } else {
-        navigator.serviceWorker.getRegistration().then(registration => {
-            if (registration) { 
-                registration.unregister().then(isUnregistered => { 
-                    if (isUnregistered) { 
-                        console.log('Service Worker unregistered');
-                    } 
-                }); 
-            }
+        
+        // Сохраняем библиотеки
+        if (libraries.length > 0) {
+            let librariesContent = '';
+            libraries.forEach(lib => {
+                librariesContent += `URL: ${lib.url}, Position: ${lib.position}, Attributes: ${lib.attributes}\n`;
+            });
+            zip.file("libraries.txt", librariesContent);
+        }
+
+        // Генерируем и скачиваем ZIP-файл
+        zip.generateAsync({type:"blob"}).then(function(content) {
+            saveAs(content, "project.zip");
+            alert("Проект сохранен в project.zip!");
         });
     }
-}
-window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferredPrompt = e; const installBtn = $('#installPwaBtn'); if(installBtn) installBtn.classList.remove('hidden'); });
-async function handleInstallClick() { const installBtn = $('#installPwaBtn'); if (!deferredPrompt || !installBtn) return; deferredPrompt.prompt(); const { outcome } = await deferredPrompt.userChoice; deferredPrompt = null; installBtn.classList.add('hidden'); }
-window.addEventListener('appinstalled', () => { deferredPrompt = null; showToast('Додаток успішно встановлено!'); });
 
-// ===== RUN CODE & FULLSCREEN =====
-function buildRunHooks(){ return `<script>(function(){ function S(v){ try{return (typeof v==='object')?JSON.stringify(v):String(v);}catch(_){return String(v)} } function send(type,args){ try{ window.opener && window.opener.postMessage({from:'editor',type,data:[].slice.call(args).map(S)}, '*'); }catch(e){} } ['log','info','warn','error'].forEach(function(k){ var o=console[k]; console[k]=function(){ send(k,arguments); try{o.apply(console,arguments)}catch(_){} };}); window.addEventListener('error',e=>send('error',[ (e.message||'Error') + (e.filename?(' @ '+e.filename+':'+e.lineno):'') ])); window.addEventListener('unhandledrejection',e=>send('error',[ (e.reason && (e.reason.message||e.reason)) || 'Unhandled promise rejection' ])); window.execFromParent = function(cmd){ try{ var r = eval(cmd); send('log', ['> ' + cmd, r]); } catch(err){ send('error', [err && err.message ? err.message : String(err)]); } }; })();<\/script>`;}
-function runCode() { 
-    saveProject(); 
-    const mainHtmlFile = projectFiles.find(f => f.name === 'index.html'); 
-    if (!mainHtmlFile) return; 
-    
-    let htmlContent = mainHtmlFile.content; 
-    const allCss = projectFiles.filter(f => f.name.endsWith('.css')).map(f => f.content).join('\n\n'); 
-    const cssBlock = `<style>\n${allCss}\n</style>`; 
-    const libTags = buildLibTags(); 
-    const hooks = buildRunHooks(); 
-    const allJsContent = projectFiles.filter(f => f.name.endsWith('.js')).map(f => f.content).join('\n\n// ----- \n\n'); 
-    const fullJsPayload = `(function(){\ntry {\n${allJsContent}\n} catch (e) { console.error(e); }\n})();`; 
-    const jsBlock = `<script>${safeScript(fullJsPayload)}<\/script>`; 
-    const headContent = `${libTags}\n${cssBlock}\n${hooks}`; 
-    
-    if (htmlContent.includes('</head>')) { 
-        htmlContent = htmlContent.replace('</head>', `${headContent}\n</head>`); 
-    } else { 
-        htmlContent = `${headContent}\n${htmlContent}`; 
-    } 
-    
-    if (htmlContent.includes('</body>')) { 
-        htmlContent = htmlContent.replace('</body>', `${jsBlock}\n</body>`); 
-    } else { 
-        htmlContent += jsBlock; 
-    } 
-    
-    if (runWin && !runWin.closed) { 
-        runWin.close(); 
-    } 
-    
-    runWin = window.open('', '_blank', 'width=800,height=600,menubar=no,toolbar=no,location=no'); 
-    if (runWin) { 
-        runWin.document.write(htmlContent); 
-        runWin.document.close(); 
-    } else { 
-        alert('Браузер заблокував спливаюче вікно. Дозвольте спливаючі вікна для цього сайту.'); 
-    } 
-}
-const debouncedRefresh = debounce(runCode, 1500);
-function toggleFullScreen() { 
-    if (!document.fullscreenElement) { 
-        document.documentElement.requestFullscreen(); 
-        $('#icon-maximize').style.display = 'none';
-        $('#icon-minimize').style.display = 'block';
-    } else if (document.exitFullscreen) { 
-        document.exitFullscreen(); 
-        $('#icon-maximize').style.display = 'block';
-        $('#icon-minimize').style.display = 'none';
-    } 
-}
+    function importFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
 
-// ===== INITIALIZATION & EVENT LISTENERS =====
-document.addEventListener('DOMContentLoaded', () => {
-    libs = loadLibs();
-    wrapOption = localStorage.getItem(LS_WRAP) === '1';
-    autoRefreshEnabled = localStorage.getItem(LS_AUTOREFRESH) === '1';
-    offlineModeEnabled = localStorage.getItem(LS_OFFLINE_MODE) === '1';
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const content = e.target.result;
+            const htmlMatch = /<body[^>]*>([\s\S]*)<\/body>/i.exec(content);
+            const cssMatch = /<style[^>]*>([\s\S]*)<\/style>/i.exec(content);
+            const jsMatch = /<script[^>]*>([\s\S]*)<\/script>/i.exec(content);
 
-    $('#wrapToggle').checked = wrapOption;
-    $('#autoRefreshToggle').checked = autoRefreshEnabled;
-    $('#offlineModeToggle').checked = offlineModeEnabled;
+            editors.html.setValue(htmlMatch ? htmlMatch[1].trim() : '');
+            editors.css.setValue(cssMatch ? cssMatch[1].trim() : '');
+            editors.js.setValue(jsMatch ? jsMatch[1].trim() : '');
+        };
+        reader.readAsText(file);
+    }
     
-    loadProject();
-    manageServiceWorker();
-
-    $('#editor-tabs').addEventListener('click', e => { 
-        const closeBtn = e.target.closest('.tab-close-btn'); 
-        if (closeBtn) { 
-            e.stopPropagation(); 
-            const filename = closeBtn.dataset.filename; 
-            if (confirm(`Видалити ${filename}?`)) { 
-                closeTab(filename); 
-            } 
-        } 
-        const tabBtn = e.target.closest('.nav-link'); 
-        if (tabBtn) { 
-            switchTab(tabBtn.dataset.filename); 
-        } 
-    });
-    
-    $('#runBtn').addEventListener('click', runCode);
-    $('#fullscreenBtn').addEventListener('click', toggleFullScreen);
-    $('#installPwaBtn').addEventListener('click', handleInstallClick);
-    $('#emmetBtn').addEventListener('click', () => { 
-        if (editors[activeFile]) { 
-            try {
-                editors[activeFile].execCommand('emmetExpandAbbreviation'); 
-            } catch(e) {
-                showToast('Помилка Emmet: ' + e.message);
-            }
-        } 
-    });
-    
-    $('#newFileBtn').addEventListener('click', e => { 
-        e.preventDefault(); 
-        const filename = prompt("Введіть ім'я файлу:"); 
-        if (filename && filename.trim()) { 
-            if (editors[filename]) { 
-                alert("Файл з таким іменем вже існує."); 
-                return; 
-            } 
-            createTab(filename, ``, true); 
-        } 
-    });
-    $('#downloadZipBtn').addEventListener('click', e => { e.preventDefault(); exportToZip(); });
-    $('#saveToBrowserBtn').addEventListener('click', e => { e.preventDefault(); saveProject(); showToast('Проєкт збережено в браузер!'); });
-    $('#importZipInput').addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { loadProjectFromZip(file); } e.target.value = ''; });
-
-    $('#wrapToggle').addEventListener('change', e => { 
-        wrapOption = e.target.checked; 
-        localStorage.setItem(LS_WRAP, wrapOption ? '1' : '0'); 
-        Object.values(editors).forEach(ed => ed.setOption('lineWrapping', wrapOption)); 
-    });
-    $('#autoRefreshToggle').addEventListener('change', e => { 
-        autoRefreshEnabled = e.target.checked; 
-        localStorage.setItem(LS_AUTOREFRESH, autoRefreshEnabled ? '1' : '0'); 
-    });
-    $('#offlineModeToggle').addEventListener('change', e => { 
-        offlineModeEnabled = e.target.checked; 
-        localStorage.setItem(LS_OFFLINE_MODE, offlineModeEnabled ? '1' : '0'); 
-        manageServiceWorker(); 
-    });
-    
-    document.addEventListener('keydown', e => { 
-        if (e.ctrlKey && e.key === 'Enter') { 
-            e.preventDefault(); 
-            runCode(); 
-        } 
-        if (e.key === 'F11') { 
-            e.preventDefault(); 
-            toggleFullScreen(); 
-        } 
-    });
-    
-    $('#consoleToggleBtn').addEventListener('click', () => toggleConsole());
-    $('#clearLog').addEventListener('click', () => { 
-        logs.length = 0; 
-        $('#console').innerHTML = ''; 
-        logCount = 0; 
-        $('#cCount').textContent = '0'; 
-        $('#cDot').className = 'dot';
-    });
-    $('#downloadLog').addEventListener('click', () => { 
-        const blob = new Blob([logs.map(l=>`[${l.level}] ${l.text}`).join('\n')], {type:'text/plain'}); 
-        const a = document.createElement('a'); 
-        a.href = URL.createObjectURL(blob); 
-        a.download='console.log'; 
-        a.click(); 
-        URL.revokeObjectURL(a.href); 
-    });
-    $('#copyLogBtn').addEventListener('click', copyLogToClipboard);
-    $('#execCmd').addEventListener('click', execCmd);
-    $('#consoleCmd').addEventListener('keydown', e => { 
-        if(e.key === 'Enter') execCmd(); 
-        else if (e.key==='ArrowUp') { 
-            if(cmdHistory.length){ 
-                histIdx = Math.max(0, (histIdx < 0 ? cmdHistory.length : histIdx) - 1); 
-                $('#consoleCmd').value = cmdHistory[histIdx]; 
-                e.preventDefault(); 
-            }
-        } else if (e.key==='ArrowDown') { 
-            if(cmdHistory.length){ 
-                histIdx++; 
-                if(histIdx >= cmdHistory.length){ 
-                    $('#consoleCmd').value = ''; 
-                    histIdx = cmdHistory.length; 
-                } else { 
-                    $('#consoleCmd').value = cmdHistory[histIdx]; 
-                } 
-                e.preventDefault(); 
-            } 
-        } 
-    });
-    window.addEventListener('message', e => { 
-        const d = e.data || {}; 
-        if(d.from !== 'editor') return; 
-        const level = (d.type || 'LOG').toUpperCase(); 
-        const text = Array.isArray(d.data) ? d.data.join(' ') : String(d.data || ''); 
-        pushLog(level, text); 
-    });
-    
-    // Library management
-    $('#mLibs').addEventListener('click', e => {
-        e.preventDefault();
-        renderLibsList();
-        const libsModal = new bootstrap.Modal($('#libsModal'));
-        libsModal.show();
-    });
-    
-    $('#addLibBtn').addEventListener('click', () => {
-        const url = $('#libUrl').value.trim();
-        if (!url) {
-            showToast('Введіть URL бібліотеки');
-            return;
+    function closeModal(modalId) {
+        const modalElement = document.getElementById(modalId);
+        const modalInstance = bootstrap.Modal.getInstance(modalElement);
+        if (modalInstance) {
+            modalInstance.hide();
         }
-        
-        // Basic URL validation
-        if (!url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('//')) {
-            showToast('URL має починатися з http://, https:// або //');
-            return;
-        }
-        
-        libs.push({
-            url: url,
-            enabled: true
-        });
-        
-        saveLibs();
-        renderLibsList();
-        $('#libUrl').value = '';
-        showToast('Бібліотеку додано');
-    });
-    
-    // Handle fullscreen change
-    document.addEventListener('fullscreenchange', () => {
-        if (!document.fullscreenElement) {
-            $('#icon-maximize').style.display = 'block';
-            $('#icon-minimize').style.display = 'none';
-        }
-    });
-});
+    }
 </script>
 
 </body>
