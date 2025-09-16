@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Онлайн редактор кода</title>
-    <link rel="icon" href="Ico.ico" type="image/x-icon">
+    <link rel="icon" type="image/png" href="./ico.png">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.es6/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
 
@@ -150,10 +150,24 @@
                 <div class="p-3 border rounded" style="background-color: var(--bg-dark);">
                     <h6 class="mb-3"><i class="bi bi-link-45deg"></i> Подключение библиотек</h6>
                     <div class="row g-2 align-items-center">
-                        <div class="col-sm-5"><input type="url" class="form-control form-control-sm" id="libUrl" placeholder="URL библиотеки..."></div>
-                        <div class="col-sm-3"><select class="form-select form-select-sm" id="libPosition"><option value="head" selected>В &lt;head&gt;</option><option value="body">В &lt;body&gt;</option></select></div>
-                        <div class="col-sm-3"><input type="text" class="form-control form-control-sm" id="libAttributes" placeholder="Атрибуты (defer)"></div>
-                        <div class="col-sm-1"><button class="btn btn-sm btn-success w-100" onclick="addLibrary()">+</button></div>
+                        <div class="col-sm-5">
+                            <input type="url" class="form-control form-control-sm" id="libUrl" placeholder="URL библиотеки...">
+                        </div>
+                        <div class="col-sm-5">
+                            <input type="file" class="form-control form-control-sm" id="libFile" accept=".js, .css" onchange="document.getElementById('libUrl').value=''">
+                        </div>
+                        <div class="col-sm-2">
+                            <select class="form-select form-select-sm" id="libPosition">
+                                <option value="head" selected>В &lt;head&gt;</option>
+                                <option value="body">В &lt;body&gt;</option>
+                            </select>
+                        </div>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control form-control-sm" id="libAttributes" placeholder="Атрибуты (defer)...">
+                        </div>
+                        <div class="col-sm-2">
+                            <button class="btn btn-sm btn-success w-100" onclick="addLibrary()">+</button>
+                        </div>
                     </div>
                     <div id="libraryList" class="mt-3 d-flex flex-wrap gap-2"></div>
                 </div>
@@ -279,14 +293,14 @@
     const faviconDisplayElement = document.getElementById('faviconDisplay');
     const faviconPreviewElement = document.getElementById('faviconPreview');
     const faviconInfoElement = document.getElementById('faviconInfo');
-    const faviconUrlInput = document.getElementById('faviconUrl');
-    const faviconFileInput = document.getElementById('faviconFile');
+    const faviconUrlInput = document.getElementById('libUrl');
+    const faviconFileInput = document.getElementById('libFile');
     const editorTabsList = document.getElementById('editorTabs');
     const editorPanels = document.querySelector('.editor-container');
     let tabCount = 0;
 
     function setFaviconFromUrl() {
-        const url = faviconUrlInput.value.trim();
+        const url = document.getElementById("faviconUrl").value.trim();
         if (url) {
             faviconHref = url;
             updateFaviconDisplay(url, "URL");
@@ -308,8 +322,8 @@
     function removeFavicon() {
         faviconHref = '';
         faviconDisplayElement.style.display = "none";
-        faviconUrlInput.value = '';
-        faviconFileInput.value = '';
+        document.getElementById("faviconUrl").value = '';
+        document.getElementById("faviconFile").value = '';
     }
 
     function updateFaviconDisplay(href, info) {
@@ -319,18 +333,40 @@
     }
 
     function addLibrary() {
-        const url = document.getElementById("libUrl").value.trim();
-        if (url) {
+        const libUrlInput = document.getElementById("libUrl");
+        const libFileInput = document.getElementById("libFile");
+        const libPosition = document.getElementById("libPosition").value;
+        const libAttributes = document.getElementById("libAttributes").value.trim();
+
+        if (libUrlInput.value.trim()) {
+            // Добавляем библиотеку по URL
             libraries.push({
-                url: url,
-                position: document.getElementById("libPosition").value,
-                attributes: document.getElementById("libAttributes").value.trim()
+                url: libUrlInput.value.trim(),
+                position: libPosition,
+                attributes: libAttributes,
+                isLocal: false
             });
             updateLibraryList();
-            document.getElementById("libUrl").value = "";
+            libUrlInput.value = "";
+            libFileInput.value = "";
+            document.getElementById("libAttributes").value = "";
+        } else if (libFileInput.files.length > 0) {
+            // Добавляем локальную библиотеку
+            const file = libFileInput.files[0];
+            const fileUrl = URL.createObjectURL(file);
+            libraries.push({
+                url: fileUrl,
+                fileName: file.name,
+                position: libPosition,
+                attributes: libAttributes,
+                isLocal: true
+            });
+            updateLibraryList();
+            libUrlInput.value = "";
+            libFileInput.value = "";
             document.getElementById("libAttributes").value = "";
         } else {
-            alert("Пожалуйста, введите URL библиотеки.");
+            alert("Пожалуйста, введите URL или выберите локальный файл.");
         }
     }
 
@@ -339,7 +375,8 @@
         libraries.forEach((lib, index) => {
             const span = document.createElement("span");
             span.className = "badge bg-secondary d-flex align-items-center";
-            span.innerHTML = `${lib.url} (${lib.position}) <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeLibrary(${index})" aria-label="Удалить"></button>`;
+            const name = lib.isLocal ? lib.fileName : lib.url;
+            span.innerHTML = `${name} (${lib.position}) <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeLibrary(${index})" aria-label="Удалить"></button>`;
             libraryListElement.appendChild(span);
         });
     }
@@ -582,7 +619,6 @@
     function saveZip() {
         const zip = new JSZip();
 
-        // Сохраняем все вкладки
         const tabItems = editorTabsList.querySelectorAll('.nav-link');
         tabItems.forEach(tab => {
             const tabId = tab.dataset.bsTarget.slice(1).replace('-panel', '');
@@ -593,16 +629,15 @@
             }
         });
         
-        // Сохраняем библиотеки
         if (libraries.length > 0) {
             let librariesContent = '';
             libraries.forEach(lib => {
-                librariesContent += `URL: ${lib.url}, Position: ${lib.position}, Attributes: ${lib.attributes}\n`;
+                const name = lib.isLocal ? lib.fileName : lib.url;
+                librariesContent += `URL: ${name}, Position: ${lib.position}, Attributes: ${lib.attributes}\n`;
             });
             zip.file("libraries.txt", librariesContent);
         }
 
-        // Генерируем и скачиваем ZIP-файл
         zip.generateAsync({type:"blob"}).then(function(content) {
             saveAs(content, "project.zip");
             alert("Проект сохранен в project.zip!");
