@@ -4,10 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Онлайн редактор кода</title>
-    <link rel="icon" type="image/png" href="./ico.png">
+    <link rel="icon" href="Ico.png" type="image/PNG">
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.es6/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
 
@@ -193,11 +193,21 @@
                         <span id="faviconInfo" class="text-white-50 small"></span>
                         <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeFavicon()"></button>
                     </div>
-                    <div class="input-group input-group-sm mb-2">
-                        <input type="url" class="form-control" id="faviconUrl" placeholder="URL иконки..."><button class="btn btn-outline-secondary" type="button" onclick="setFaviconFromUrl()">Установить</button>
-                    </div>
-                    <div class="input-group input-group-sm">
-                        <input type="file" class="form-control" id="faviconFile" accept="image/*" onchange="setFaviconFromFile(event)">
+                    <div class="row g-2 align-items-center">
+                        <div class="col-sm-6">
+                            <input type="url" class="form-control form-control-sm" id="faviconUrl" placeholder="URL иконки...">
+                        </div>
+                        <div class="col-sm-3">
+                            <input type="file" class="form-control form-control-sm" id="faviconFile" accept="image/*" onchange="document.getElementById('faviconUrl').value=''">
+                        </div>
+                        <div class="col-sm-3">
+                             <select class="form-select form-select-sm" id="faviconType">
+                                <option value="image/x-icon">ICO</option>
+                                <option value="image/png">PNG</option>
+                                <option value="image/gif">GIF</option>
+                            </select>
+                        </div>
+                        <div class="col-12"><button class="btn btn-outline-secondary btn-sm w-100" onclick="setFavicon()">Установить</button></div>
                     </div>
                 </div>
             </div>
@@ -268,11 +278,24 @@
         autoCloseBrackets: true
     };
 
-    const editors = {
-        html: CodeMirror(document.getElementById('htmlEditor'), { ...commonConfig, mode: 'xml', extraKeys: {"Ctrl-Enter": runCode} }),
-        css: CodeMirror(document.getElementById('cssEditor'), { ...commonConfig, mode: 'css', extraKeys: {"Ctrl-Enter": runCode} }),
-        js: CodeMirror(document.getElementById('jsEditor'), { ...commonConfig, mode: 'javascript', extraKeys: {"Ctrl-Enter": runCode} })
+    const editors = {};
+
+    const editorTabsList = document.getElementById('editorTabs');
+    const editorPanels = document.querySelector('.editor-container');
+    const mainEditors = {
+        html: { id: 'htmlEditor', panelId: 'html-panel', mode: 'xml', name: 'HTML' },
+        css: { id: 'cssEditor', panelId: 'css-panel', mode: 'css', name: 'CSS' },
+        js: { id: 'jsEditor', panelId: 'js-panel', mode: 'javascript', name: 'JavaScript' }
     };
+    let tabCount = 0;
+
+    for (const type in mainEditors) {
+        editors[type] = CodeMirror(document.getElementById(mainEditors[type].id), {
+            ...commonConfig,
+            mode: mainEditors[type].mode,
+            extraKeys: { "Ctrl-Enter": runCode }
+        });
+    }
 
     document.addEventListener('keydown', (e) => {
         if (e.ctrlKey && e.key === 'Enter') {
@@ -287,43 +310,40 @@
     });
 
     let libraries = [];
-    let faviconHref = '';
+    let favicon = {};
     const consoleElement = document.getElementById('console');
     const libraryListElement = document.getElementById('libraryList');
     const faviconDisplayElement = document.getElementById('faviconDisplay');
     const faviconPreviewElement = document.getElementById('faviconPreview');
     const faviconInfoElement = document.getElementById('faviconInfo');
-    const faviconUrlInput = document.getElementById('libUrl');
-    const faviconFileInput = document.getElementById('libFile');
-    const editorTabsList = document.getElementById('editorTabs');
-    const editorPanels = document.querySelector('.editor-container');
-    let tabCount = 0;
+    const faviconUrlInput = document.getElementById('faviconUrl');
+    const faviconFileInput = document.getElementById('faviconFile');
+    const faviconTypeInput = document.getElementById('faviconType');
 
-    function setFaviconFromUrl() {
-        const url = document.getElementById("faviconUrl").value.trim();
-        if (url) {
-            faviconHref = url;
-            updateFaviconDisplay(url, "URL");
-        }
-    }
-
-    function setFaviconFromFile(event) {
-        const file = event.target.files[0];
-        if (file) {
+    function setFavicon() {
+        if (faviconUrlInput.value.trim()) {
+            favicon.href = faviconUrlInput.value.trim();
+            favicon.type = faviconTypeInput.value;
+            updateFaviconDisplay(favicon.href, "URL");
+        } else if (faviconFileInput.files.length > 0) {
+            const file = faviconFileInput.files[0];
             const reader = new FileReader();
             reader.onload = (e) => {
-                faviconHref = e.target.result;
-                updateFaviconDisplay(faviconHref, file.name);
+                favicon.href = e.target.result;
+                favicon.type = faviconTypeInput.value;
+                updateFaviconDisplay(favicon.href, file.name);
             };
             reader.readAsDataURL(file);
+        } else {
+            alert("Пожалуйста, введите URL или выберите локальный файл для иконки.");
         }
     }
 
     function removeFavicon() {
-        faviconHref = '';
+        favicon = {};
         faviconDisplayElement.style.display = "none";
-        document.getElementById("faviconUrl").value = '';
-        document.getElementById("faviconFile").value = '';
+        faviconUrlInput.value = '';
+        faviconFileInput.value = '';
     }
 
     function updateFaviconDisplay(href, info) {
@@ -339,7 +359,6 @@
         const libAttributes = document.getElementById("libAttributes").value.trim();
 
         if (libUrlInput.value.trim()) {
-            // Добавляем библиотеку по URL
             libraries.push({
                 url: libUrlInput.value.trim(),
                 position: libPosition,
@@ -351,7 +370,6 @@
             libFileInput.value = "";
             document.getElementById("libAttributes").value = "";
         } else if (libFileInput.files.length > 0) {
-            // Добавляем локальную библиотеку
             const file = libFileInput.files[0];
             const fileUrl = URL.createObjectURL(file);
             libraries.push({
@@ -526,7 +544,7 @@
         `;
 
         const jsExecutionScript = `<script>try { ${jsCode} } catch(e) { console.error(e.message); }<\/script>`;
-        const faviconLink = faviconHref ? `<link rel="icon" href="${faviconHref}">` : "";
+        const faviconLink = favicon.href ? `<link rel="icon" href="${favicon.href}" type="${favicon.type}">` : "";
 
         const newWindow = window.open();
         if (newWindow) {
@@ -591,7 +609,7 @@
         libraries = [];
         updateLibraryList();
         
-        faviconHref = '';
+        favicon = {};
         removeFavicon();
         
         alert("Проект очищен!");
@@ -669,6 +687,47 @@
             modalInstance.hide();
         }
     }
+
+    function saveState() {
+        const state = {
+            editors: {},
+            libraries: libraries,
+            favicon: favicon
+        };
+
+        for (const key in editors) {
+            state.editors[key] = editors[key].getValue();
+        }
+
+        localStorage.setItem('online_editor_state', JSON.stringify(state));
+    }
+
+    function loadState() {
+        const savedState = localStorage.getItem('online_editor_state');
+        if (savedState) {
+            const state = JSON.parse(savedState);
+            
+            // Загрузка содержимого редакторов
+            for (const key in state.editors) {
+                if (editors[key]) {
+                    editors[key].setValue(state.editors[key]);
+                }
+            }
+            
+            // Загрузка библиотек
+            libraries = state.libraries || [];
+            updateLibraryList();
+
+            // Загрузка favicon
+            if (state.favicon && state.favicon.href) {
+                favicon = state.favicon;
+                updateFaviconDisplay(favicon.href, favicon.href.startsWith('data:') ? 'Локальный файл' : 'URL');
+            }
+        }
+    }
+
+    window.addEventListener('load', loadState);
+    setInterval(saveState, 2000);
 </script>
 
 </body>
