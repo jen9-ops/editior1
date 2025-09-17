@@ -1,729 +1,805 @@
 <!DOCTYPE html>
-<html lang="ua">
+<html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Редактор кода</title>
-    <link rel="icon" href="./ico1.png" type="image/png">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Онлайн IDE — фиксированная версия</title>
+  <link rel="icon" href="./ico1.png" type="image/png" />
 
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css">
+  <!-- UI libs -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css" />
+  <!-- Fold gutter CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/foldgutter.min.css" />
 
-    <style>
-        :root {
-            --bg-dark: #212529;
-            --bg-light: #282a36;
-            --border-color: #44475a;
-            --primary-color: #8be9fd;
-            --text-color: #f8f8f2;
-        }
-        html, body {
-            height: 100vh;
-            margin: 0;
-            padding: 0;
-            background-color: var(--bg-dark);
-            color: var(--text-color);
-        }
-        .main-container {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            padding: 0.75rem;
-        }
-        .top-bar {
-            flex-shrink: 0;
-            position: sticky;
-            top: 0;
-            z-index: 1020;
-            background-color: var(--bg-dark);
-            padding-bottom: 0.5rem;
-        }
-        .nav-tabs {
-            flex-shrink: 0;
-            position: sticky;
-            z-index: 1010;
-            background-color: var(--bg-dark);
-        }
-        .nav-tabs .nav-link {
-            background-color: transparent;
-            border-color: transparent;
-            color: var(--text-color);
-            position: relative;
-        }
-        .nav-tabs .nav-link.active {
-            background-color: var(--bg-light);
-            border-color: var(--border-color);
-            color: var(--primary-color);
-        }
-        .editor-container {
-            flex-grow: 1;
-            min-height: 0;
-            border: 1px solid var(--border-color);
-            border-radius: 0 0 0.375rem 0.375rem;
-        }
-        .CodeMirror {
-            height: 100%;
-            font-family: 'Fira Code', 'Courier New', monospace;
-            font-size: 14px;
-        }
-        #console {
-            width: 100%;
-            height: 100%;
-            background-color: #212121;
-            border: 1px solid var(--border-color);
-            border-radius: 0.375rem;
-            padding: 10px;
-            overflow-y: auto;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-        }
-        .modal-content {
-            background-color: var(--bg-light);
-            border: 1px solid var(--border-color);
-        }
-        .modal-header, .modal-footer {
-            border-color: var(--border-color);
-        }
-        .close-tab-btn {
-            position: absolute;
-            top: 50%;
-            right: 5px;
-            transform: translateY(-50%);
-            font-size: 0.7em;
-            color: #f8f8f2;
-            cursor: pointer;
-            line-height: 1;
-        }
+  <style>
+    :root {
+      --bg-dark: #212529;
+      --bg-light: #282a36;
+      --border-color: #44475a;
+      --primary-color: #8be9fd;
+      --text-color: #f8f8f2;
+    }
+    html, body { height: 100vh; margin: 0; padding: 0; background: var(--bg-dark); color: var(--text-color); }
+    .main-container { display: flex; height: 100%; padding: .75rem; gap: .75rem; }
+    .file-tree-sidebar { width: 250px; flex-shrink: 0; border: 1px solid var(--border-color); border-radius: .375rem; overflow-y: auto; transition: width .2s ease; }
+    .file-tree-sidebar.closed { width: 0; border: none; padding: 0; overflow: hidden; }
+    .file-tree-sidebar .list-group-item { cursor: pointer; padding: .25rem 1rem; display: flex; align-items: center; }
+    .file-tree-sidebar .list-group-item:hover { background: #333644; }
+    .file-tree-sidebar .list-group-item.active { background: var(--primary-color); color: #111; }
+    .editor-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .top-bar { display:flex; align-items:center; justify-content: space-between; gap: .5rem; }
+    .editor-container { flex: 1; min-height: 0; border: 1px solid var(--border-color); border-radius: 0 .375rem .375rem .375rem; }
+    .nav-tabs .nav-link { color: var(--text-color); border: none; }
+    .nav-tabs .nav-link.active { background: var(--bg-light); color: var(--primary-color); border: 1px solid var(--border-color); border-bottom-color: transparent; }
+    .close-tab-btn { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); font-size: .75em; cursor: pointer; }
+    .CodeMirror { height: 100%; font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+    #console { width:100%; height:100%; background:#111; border:1px solid var(--border-color); border-radius:.375rem; padding:10px; overflow:auto; font-family: Consolas, monospace; font-size: 13px; }
+    #faviconDisplay { display:none; }
 
-        /* Медиа-запрос для адаптивности */
-        @media (max-width: 768px) {
-            .main-container {
-                padding: 0.5rem;
-            }
-            .top-bar {
-                padding-bottom: 0.25rem;
-                font-size: 0.8em;
-            }
-            .CodeMirror {
-                font-size: 12px;
-            }
-            .modal-dialog-centered {
-                margin: 0.5rem;
-            }
-            .modal-body .btn {
-                font-size: 0.9rem;
-            }
-        }
-    </style>
+    @media (max-width: 768px) {
+      .main-container { flex-direction: column; }
+      .file-tree-sidebar { width: 100%; max-height: 220px; }
+      .file-tree-sidebar.closed { height: 0; }
+      .CodeMirror { font-size: 12px; }
+    }
+  </style>
 </head>
 <body>
-
-<div class="main-container">
-    <ul class="nav nav-tabs" id="editorTabs" role="tablist">
-        <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#html-panel" type="button" role="tab">HTML</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#css-panel" type="button" role="tab">CSS</button></li>
-        <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#js-panel" type="button" role="tab">JavaScript</button></li>
-    </ul>
-
-    <div class="editor-container tab-content">
-        <div class="tab-pane fade show active h-100" id="html-panel" role="tabpanel"><div id="htmlEditor"></div></div>
-        <div class="tab-pane fade h-100" id="css-panel" role="tabpanel"><div id="cssEditor"></div></div>
-        <div class="tab-pane fade h-100" id="js-panel" role="tabpanel"><div id="jsEditor"></div></div>
-    </div>
-</div>
-
-<div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-tools"></i> Настройки и Инструменты</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="p-3 border rounded" style="background-color: var(--bg-dark);">
-                    <h6 class="mb-3"><i class="bi bi-link-45deg"></i> Подключение библиотек</h6>
-                    <div class="row g-2 align-items-center">
-                        <div class="col-sm-5">
-                            <input type="url" class="form-control form-control-sm" id="libUrl" placeholder="URL библиотеки...">
-                        </div>
-                        <div class="col-sm-5">
-                            <input type="file" class="form-control form-control-sm" id="libFile" accept=".js, .css" onchange="document.getElementById('libUrl').value=''">
-                        </div>
-                        <div class="col-sm-2">
-                            <select class="form-select form-select-sm" id="libPosition">
-                                <option value="head" selected>В &lt;head&gt;</option>
-                                <option value="body">В &lt;body&gt;</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-10">
-                            <input type="text" class="form-control form-control-sm" id="libAttributes" placeholder="Атрибуты (defer)...">
-                        </div>
-                        <div class="col-sm-2">
-                            <button class="btn btn-sm btn-success w-100" onclick="addLibrary()">+</button>
-                        </div>
-                    </div>
-                    <div id="libraryList" class="mt-3 d-flex flex-wrap gap-2"></div>
-                </div>
-                <div class="p-3 mt-3 border rounded" style="background-color: var(--bg-dark);">
-                    <h6 class="mb-3"><i class="bi bi-code-slash"></i> Добавление вкладок</h6>
-                    <div class="row g-2 align-items-center">
-                        <div class="col-sm-6">
-                            <select class="form-select form-select-sm" id="tabType">
-                                <option value="html">HTML</option>
-                                <option value="css">CSS</option>
-                                <option value="js">JavaScript</option>
-                                <option value="json">JSON</option>
-                                <option value="txt">Text</option>
-                            </select>
-                        </div>
-                        <div class="col-sm-6"><button class="btn btn-sm btn-success w-100" onclick="addEditorTab()">Добавить вкладку</button></div>
-                    </div>
-                </div>
-                <div class="p-3 mt-3 border rounded" style="background-color: var(--bg-dark);">
-                    <h6 class="mb-3"><i class="bi bi-image"></i> Favicon</h6>
-                    <div id="faviconDisplay" class="mb-2 d-inline-flex align-items-center" style="display: none !important;">
-                        <img id="faviconPreview" src="" alt="icon" style="width: 16px; height: 16px; margin-right: 8px;">
-                        <span id="faviconInfo" class="text-white-50 small"></span>
-                        <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeFavicon()"></button>
-                    </div>
-                    <div class="row g-2 align-items-center">
-                        <div class="col-sm-6">
-                            <input type="url" class="form-control form-control-sm" id="faviconUrl" placeholder="URL иконки...">
-                        </div>
-                        <div class="col-sm-3">
-                            <input type="file" class="form-control form-control-sm" id="faviconFile" accept="image/*" onchange="document.getElementById('faviconUrl').value=''">
-                        </div>
-                        <div class="col-sm-3">
-                             <select class="form-select form-select-sm" id="faviconType">
-                                <option value="image/x-icon">ICO</option>
-                                <option value="image/png">PNG</option>
-                                <option value="image/gif">GIF</option>
-                            </select>
-                        </div>
-                        <div class="col-12"><button class="btn btn-outline-secondary btn-sm w-100" onclick="setFavicon()">Установить</button></div>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer d-flex justify-content-between">
-                <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmClearCode()"><i class="bi bi-trash"></i> Очистить проект</button>
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="trimWhitespaceCheckbox"><label class="form-check-label" for="trimWhitespaceCheckbox">Очистить пробелы</label>
-                </div>
-            </div>
+  <div class="main-container">
+    <!-- Sidebar / Project tree -->
+    <div id="sidebar" class="file-tree-sidebar bg-dark p-3">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="text-white-50 mb-0">Проект</h6>
+        <div class="btn-group">
+          <button class="btn btn-sm btn-outline-light" title="Новый файл" onclick="createNewFile()"><i class="bi bi-file-plus"></i></button>
+          <button class="btn btn-sm btn-outline-light" title="Новая папка" onclick="createNewFolder()"><i class="bi bi-folder-plus"></i></button>
         </div>
+      </div>
+      <div id="fileTree" class="list-group list-group-flush"></div>
     </div>
-</div>
 
-<div class="modal fade" id="contextMenuModal" tabindex="-1" aria-hidden="true">
+    <!-- Editor area -->
+    <div class="editor-area">
+      <div class="top-bar mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-outline-light" onclick="toggleSidebar()" title="Показать/скрыть дерево"><i class="bi bi-list"></i></button>
+          <span class="fs-5 fw-bold"><i class="bi bi-emoji-poop-fill"></i> Онлайн IDE</span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <button class="btn btn-sm btn-success" onclick="runCode()" title="Запуск (Ctrl+Enter)"><i class="bi bi-play-fill"></i></button>
+          <button class="btn btn-sm btn-warning" onclick="showConsoleModal()" title="Консоль"><i class="bi bi-terminal"></i></button>
+          <button class="btn btn-sm btn-secondary" onclick="showSettingsModal()" title="Настройки"><i class="bi bi-gear"></i></button>
+          <div class="form-check form-check-inline ms-2">
+            <input class="form-check-input" type="checkbox" id="trimWhitespaceCheckbox">
+            <label class="form-check-label" for="trimWhitespaceCheckbox" title="Перед запуском/сохранением удалить хвостовые пробелы">Очистить пробелы</label>
+          </div>
+        </div>
+      </div>
+
+      <ul class="nav nav-tabs" id="editorTabs" role="tablist"></ul>
+      <div class="editor-container tab-content"></div>
+    </div>
+  </div>
+
+  <!-- Settings modal -->
+  <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content" style="background: var(--bg-light); border:1px solid var(--border-color)">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-tools"></i> Настройки и инструменты</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <!-- Libraries -->
+          <div class="p-3 border rounded" style="background: var(--bg-dark); border-color: var(--border-color)">
+            <h6 class="mb-3"><i class="bi bi-link-45deg"></i> Подключение библиотек</h6>
+            <div class="row g-2 align-items-center">
+              <div class="col-sm-5"><input type="url" class="form-control form-control-sm" id="libUrl" placeholder="URL библиотеки (.js/.css)..." /></div>
+              <div class="col-sm-3"><input type="file" class="form-control form-control-sm" id="libFile" accept=".js,.css" onchange="document.getElementById('libUrl').value=''" /></div>
+              <div class="col-sm-2">
+                <select class="form-select form-select-sm" id="libPosition">
+                  <option value="head" selected>В &lt;head&gt;</option>
+                  <option value="body">В &lt;body&gt;</option>
+                </select>
+              </div>
+              <div class="col-sm-2"><button class="btn btn-sm btn-success w-100" onclick="addLibrary()">+</button></div>
+              <div class="col-12 mt-2"><input type="text" class="form-control form-control-sm" id="libAttributes" placeholder="Атрибуты (defer, type=module, rel=stylesheet)..." /></div>
+            </div>
+            <div id="libraryList" class="mt-3 d-flex flex-wrap gap-2"></div>
+          </div>
+
+          <!-- Favicon -->
+          <div class="p-3 mt-3 border rounded" style="background: var(--bg-dark); border-color: var(--border-color)">
+            <h6 class="mb-3"><i class="bi bi-image"></i> Favicon</h6>
+            <div id="faviconDisplay" class="mb-2 d-inline-flex align-items-center">
+              <img id="faviconPreview" src="" alt="icon" style="width:16px;height:16px;margin-right:8px" />
+              <span id="faviconInfo" class="text-white-50 small"></span>
+              <button class="btn-close btn-close-white ms-2" style="font-size:.7em" onclick="removeFavicon()"></button>
+            </div>
+            <div class="row g-2 align-items-center">
+              <div class="col-sm-6"><input type="url" class="form-control form-control-sm" id="faviconUrl" placeholder="URL иконки..." /></div>
+              <div class="col-sm-3"><input type="file" class="form-control form-control-sm" id="faviconFile" accept="image/*" onchange="document.getElementById('faviconUrl').value=''" /></div>
+              <div class="col-sm-3">
+                <select class="form-select form-select-sm" id="faviconType">
+                  <option value="image/x-icon">ICO</option>
+                  <option value="image/png">PNG</option>
+                  <option value="image/gif">GIF</option>
+                </select>
+              </div>
+              <div class="col-12"><button class="btn btn-outline-secondary btn-sm w-100" onclick="setFavicon()">Установить</button></div>
+            </div>
+          </div>
+
+          <!-- Emmet + AutoCloseTags -->
+          <div class="p-3 mt-3 border rounded" style="background: var(--bg-dark); border-color: var(--border-color)">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+              <h6 class="mb-0"><i class="bi bi-lightning-charge"></i> Emmet</h6>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="emmetToggle">
+                <label class="form-check-label" for="emmetToggle">Tab/Enter в HTML/CSS</label>
+              </div>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+              <h6 class="mb-0"><i class="bi bi-slash-square"></i> Автозакрытие тегов</h6>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="autoCloseToggle">
+                <label class="form-check-label" for="autoCloseToggle">В HTML-редакторе</label>
+              </div>
+            </div>
+
+            <details class="mt-3">
+              <summary class="text-white-50">Шпаргалка Emmet (кликни)</summary>
+              <div class="small mt-2">
+                <div><code>ul>li.item*3>a{link}</code> → список с ссылками</div>
+                <div><code>header>nav>ul>li*5>a[href="#"]{Item $}</code></div>
+                <div><code>.card>h3{Title}+p{Lorem}+a.btn{Open}</code></div>
+                <div><code>form>label[for=email]{Email}+input#email[type=email]</code></div>
+                <hr class="my-2" />
+                <div><strong>CSS:</strong></div>
+                <div><code>m10</code> → <code>margin: 10px;</code></div>
+                <div><code>p10</code> → <code>padding: 10px;</code></div>
+                <div><code>w100p</code> → <code>width: 100%;</code></div>
+                <div><code>h100vh</code> → <code>height: 100vh;</code></div>
+                <div><code>d:f</code> → <code>display: flex;</code>, <code>ai:c</code> → <code>align-items: center;</code>, <code>jc:sb</code> → <code>justify-content: space-between;</code></div>
+              </div>
+            </details>
+            <div class="small text-white-50 mt-2">Свернуть/развернуть блок: клик по треугольнику слева или <kbd>Ctrl</kbd>+<kbd>Q</kbd>.</div>
+          </div>
+        </div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-danger btn-sm" onclick="confirmClearProject()"><i class="bi bi-trash"></i> Очистить проект</button>
+          <div class="btn-group">
+            <button class="btn btn-outline-success btn-sm" onclick="saveCode()"><i class="bi bi-download"></i> Сохранить .html</button>
+            <button class="btn btn-outline-success btn-sm" onclick="saveZip()"><i class="bi bi-file-earmark-zip"></i> Сохранить .zip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Context menu (triple-click anywhere) -->
+  <div class="modal fade" id="contextMenuModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body pt-0 d-flex flex-column gap-2">
-                <button class="btn btn-primary d-flex align-items-center gap-2" onclick="runCode()" data-bs-dismiss="modal"><i class="bi bi-play-fill"></i> Выполнить</button>
-                <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="showSettingsModal()" data-bs-dismiss="modal"><i class="bi bi-gear-fill"></i> Настройки</button>
-                
-                <hr class="my-2" style="border-color: var(--border-color);">
-                <button class="btn btn-success d-flex align-items-center gap-2" onclick="saveCode()" data-bs-dismiss="modal"><i class="bi bi-download"></i> Сохранить .html</button>
-                <button class="btn btn-success d-flex align-items-center gap-2" onclick="saveZip()" data-bs-dismiss="modal"><i class="bi bi-file-earmark-zip"></i> Сохранить .zip</button>
-                <button class="btn btn-warning d-flex align-items-center gap-2" onclick="showConsoleModal()" data-bs-dismiss="modal"><i class="bi bi-terminal"></i> Консоль</button>
-                <label class="btn btn-info mb-0 d-flex align-items-center gap-2" for="importFile2"><i class="bi bi-folder2-open"></i> Импорт</label>
-                <input type="file" id="importFile2" accept=".html" onchange="importFile(event); closeModal('contextMenuModal');" hidden>
-            </div>
+      <div class="modal-content" style="background: var(--bg-light); border:1px solid var(--border-color)">
+        <div class="modal-header border-0 pb-0">
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <div class="modal-body pt-0 d-flex flex-column gap-2">
+          <button class="btn btn-primary d-flex align-items-center gap-2" onclick="runCode()" data-bs-dismiss="modal"><i class="bi bi-play-fill"></i> Выполнить</button>
+          <button class="btn btn-secondary d-flex align-items-center gap-2" onclick="showSettingsModal()" data-bs-dismiss="modal"><i class="bi bi-gear-fill"></i> Настройки</button>
+          <hr class="my-2" style="border-color: var(--border-color);" />
+          <button class="btn btn-success d-flex align-items-center gap-2" onclick="saveCode()" data-bs-dismiss="modal"><i class="bi bi-download"></i> Сохранить .html</button>
+          <button class="btn btn-success d-flex align-items-center gap-2" onclick="saveZip()" data-bs-dismiss="modal"><i class="bi bi-file-earmark-zip"></i> Сохранить .zip</button>
+          <button class="btn btn-warning d-flex align-items-center gap-2" onclick="showConsoleModal()" data-bs-dismiss="modal"><i class="bi bi-terminal"></i> Консоль</button>
+          <label class="btn btn-info mb-0 d-flex align-items-center gap-2" for="importFile2"><i class="bi bi-folder2-open"></i> Импорт HTML</label>
+          <input type="file" id="importFile2" accept=".html" onchange="importFile(event); closeModal('contextMenuModal');" hidden />
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-<div class="modal fade" id="consoleModal" tabindex="-1" aria-hidden="true">
+  <!-- Console modal -->
+  <div class="modal fade" id="consoleModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title"><i class="bi bi-terminal"></i> Консоль</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="console"></div>
-            </div>
-            <div class="modal-footer d-flex justify-content-between">
-                <button type="button" class="btn btn-success btn-sm" onclick="copyConsoleToClipboard()"><i class="bi bi-clipboard-plus"></i> Сохранить в буфер</button>
-                <button type="button" class="btn btn-danger btn-sm" onclick="clearConsole()"><i class="bi bi-trash"></i> Очистить</button>
-            </div>
+      <div class="modal-content" style="background: var(--bg-light); border:1px solid var(--border-color)">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-terminal"></i> Консоль</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
+        <div class="modal-body"><div id="console"></div></div>
+        <div class="modal-footer d-flex justify-content-between">
+          <button type="button" class="btn btn-success btn-sm" onclick="copyConsoleToClipboard()"><i class="bi bi-clipboard-plus"></i> В буфер</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="clearConsole()"><i class="bi bi-trash"></i> Очистить</button>
+        </div>
+      </div>
     </div>
-</div>
+  </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <!-- libs -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-<script>
-    const commonConfig = {
-        lineNumbers: true,
-        theme: 'dracula',
-        lineWrapping: true,
-        autofocus: true,
-        autoCloseBrackets: true
-    };
+  <!-- CodeMirror core + modes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/htmlmixed/htmlmixed.min.js"></script>
 
-    const editors = {};
+  <!-- Addons: edit & tags -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/matchbrackets.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closetag.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/matchtags.min.js"></script>
 
-    const editorTabsList = document.getElementById('editorTabs');
-    const editorPanels = document.querySelector('.editor-container');
-    const mainEditors = {
-        html: { id: 'htmlEditor', panelId: 'html-panel', mode: 'xml', name: 'HTML' },
-        css: { id: 'cssEditor', panelId: 'css-panel', mode: 'css', name: 'CSS' },
-        js: { id: 'jsEditor', panelId: 'js-panel', mode: 'javascript', name: 'JavaScript' }
-    };
-    let tabCount = 0;
+  <!-- Addons: folding -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/foldcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/foldgutter.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/brace-fold.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/comment-fold.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/xml-fold.min.js"></script>
 
-    for (const type in mainEditors) {
-        editors[type] = CodeMirror(document.getElementById(mainEditors[type].id), {
-            ...commonConfig,
-            mode: mainEditors[type].mode,
-            extraKeys: { "Ctrl-Enter": runCode }
-        });
+  <!-- Emmet for CodeMirror 5 -->
+  <script src="https://cdn.jsdelivr.net/npm/emmet-codemirror@1.2.5/dist/emmet.js"></script>
+
+  <!-- Zip/save -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+  <script>
+    /*****************
+     * State, settings & FS
+     *****************/
+    const SETTINGS_KEY = 'online_ide_settings_v2';
+    let settings = { emmetEnabled: true, autoCloseTagsEnabled: true };
+
+    function loadSettings(){
+      try {
+        const raw = localStorage.getItem(SETTINGS_KEY);
+        if (raw) settings = { ...settings, ...JSON.parse(raw) };
+      } catch(_) {}
+    }
+    function saveSettings(){
+      try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(_) {}
     }
 
-    document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey && e.key === 'Enter') {
-            e.preventDefault();
-            runCode();
-        }
-    });
+    const commonConfig = {
+      lineNumbers: true,
+      theme: 'dracula',
+      lineWrapping: true,
+      autofocus: true,
+      autoCloseBrackets: true,
+      matchBrackets: true,
+      // Folding UI
+      foldGutter: true,
+      gutters: ["CodeMirror-linenumbers","CodeMirror-foldgutter"]
+      // autoCloseTags настраиваем динамически per-editor из settings
+    };
+    const editors = {}; // key = filePath
 
-    document.addEventListener('dblclick', (e) => {
-        const modal = new bootstrap.Modal(document.getElementById('contextMenuModal'));
-        modal.show();
-    });
+    // Tree: files are objects with {content, type, path, isOpen}; folders are plain objects (no content)
+    let fileSystem = {
+      'index.html': { content: '<h1>Привет, мир!</h1>', type: 'html', path: 'index.html', isOpen: true },
+      'style.css': { content: 'body { font-family: sans-serif; background:#282a36; color:#f8f8f2; }', type: 'css', path: 'style.css', isOpen: true },
+      'main.js'  : { content: 'console.log("Приложение запущено!")', type: 'js', path: 'main.js', isOpen: true }
+    };
 
-    let libraries = [];
-    let favicon = {};
+    let libraries = []; // {url, fileName?, position: 'head'|'body', attributes: string, isLocal: bool, kind: 'js'|'css'}
+    let favicon = {};  // {href, type}
+    let activeFile = 'index.html';
+
+    const fileTreeElement = document.getElementById('fileTree');
+    const editorTabsList = document.getElementById('editorTabs');
+    const editorPanels   = document.querySelector('.editor-container');
     const consoleElement = document.getElementById('console');
     const libraryListElement = document.getElementById('libraryList');
-    const faviconDisplayElement = document.getElementById('faviconDisplay');
-    const faviconPreviewElement = document.getElementById('faviconPreview');
-    const faviconInfoElement = document.getElementById('faviconInfo');
-    const faviconUrlInput = document.getElementById('faviconUrl');
-    const faviconFileInput = document.getElementById('faviconFile');
-    const faviconTypeInput = document.getElementById('faviconType');
 
-    function setFavicon() {
-        if (faviconUrlInput.value.trim()) {
-            favicon.href = faviconUrlInput.value.trim();
-            favicon.type = faviconTypeInput.value;
-            updateFaviconDisplay(favicon.href, "URL");
-        } else if (faviconFileInput.files.length > 0) {
-            const file = faviconFileInput.files[0];
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                favicon.href = e.target.result;
-                favicon.type = faviconTypeInput.value;
-                updateFaviconDisplay(favicon.href, file.name);
-            };
-            reader.readAsDataURL(file);
-        } else {
-            alert("Пожалуйста, введите URL или выберите локальный файл для иконки.");
-        }
-    }
+    function initIDE() {
+      loadSettings();
+      loadState();
+      renderFileTree(fileSystem, fileTreeElement);
+      renderOpenTabs();
+      if (activeFile && getFileObject(activeFile)) openFile(activeFile); else if (getFileObject('index.html')) openFile('index.html');
 
-    function removeFavicon() {
-        favicon = {};
-        faviconDisplayElement.style.display = "none";
-        faviconUrlInput.value = '';
-        faviconFileInput.value = '';
-    }
-
-    function updateFaviconDisplay(href, info) {
-        faviconPreviewElement.src = href;
-        faviconInfoElement.textContent = info;
-        faviconDisplayElement.style.display = "inline-flex";
-    }
-
-    function addLibrary() {
-        const libUrlInput = document.getElementById("libUrl");
-        const libFileInput = document.getElementById("libFile");
-        const libPosition = document.getElementById("libPosition").value;
-        const libAttributes = document.getElementById("libAttributes").value.trim();
-
-        if (libUrlInput.value.trim()) {
-            libraries.push({
-                url: libUrlInput.value.trim(),
-                position: libPosition,
-                attributes: libAttributes,
-                isLocal: false
-            });
-            updateLibraryList();
-            libUrlInput.value = "";
-            libFileInput.value = "";
-            document.getElementById("libAttributes").value = "";
-        } else if (libFileInput.files.length > 0) {
-            const file = libFileInput.files[0];
-            const fileUrl = URL.createObjectURL(file);
-            libraries.push({
-                url: fileUrl,
-                fileName: file.name,
-                position: libPosition,
-                attributes: libAttributes,
-                isLocal: true
-            });
-            updateLibraryList();
-            libUrlInput.value = "";
-            libFileInput.value = "";
-            document.getElementById("libAttributes").value = "";
-        } else {
-            alert("Пожалуйста, введите URL или выберите локальный файл.");
-        }
-    }
-
-    function updateLibraryList() {
-        libraryListElement.innerHTML = "";
-        libraries.forEach((lib, index) => {
-            const span = document.createElement("span");
-            span.className = "badge bg-secondary d-flex align-items-center";
-            const name = lib.isLocal ? lib.fileName : lib.url;
-            span.innerHTML = `${name} (${lib.position}) <button class="btn-close btn-close-white ms-2" style="font-size: 0.7em;" onclick="removeLibrary(${index})" aria-label="Удалить"></button>`;
-            libraryListElement.appendChild(span);
+      // UI toggles
+      const emmetToggle = document.getElementById('emmetToggle');
+      if (emmetToggle){
+        emmetToggle.checked = !!settings.emmetEnabled;
+        emmetToggle.addEventListener('change', () => {
+          settings.emmetEnabled = emmetToggle.checked;
+          applyEmmetToAll();
+          saveSettings();
         });
-    }
-
-    function removeLibrary(index) {
-        libraries.splice(index, 1);
-        updateLibraryList();
-    }
-
-    function showSettingsModal() {
-        const modal = new bootstrap.Modal(document.getElementById('settingsModal'));
-        modal.show();
-    }
-    
-    function showConsoleModal() {
-        const modal = new bootstrap.Modal(document.getElementById('consoleModal'));
-        modal.show();
-    }
-    
-    function clearConsole() {
-        consoleElement.innerHTML = '';
-    }
-    
-    function copyConsoleToClipboard() {
-        const textToCopy = consoleElement.innerText;
-        navigator.clipboard.writeText(textToCopy).then(() => {
-            alert('Лог скопирован в буфер обмена!');
-        }).catch(err => {
-            console.error('Не удалось скопировать текст: ', err);
-            alert('Ошибка при копировании лога.');
+      }
+      const autoCloseToggle = document.getElementById('autoCloseToggle');
+      if (autoCloseToggle){
+        autoCloseToggle.checked = !!settings.autoCloseTagsEnabled;
+        autoCloseToggle.addEventListener('change', () => {
+          settings.autoCloseTagsEnabled = autoCloseToggle.checked;
+          applyAutoCloseToAll();
+          saveSettings();
         });
+      }
+
+      // global shortcuts
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveZip(); }
+      });
+
+      // receive console output from preview
+      window.addEventListener('message', (e) => {
+        const d = e.data || {}; if (!d.type) return;
+        appendConsole(d.type, d.message || '');
+      });
+
+      // triple-click anywhere to open quick menu
+      setupTripleClickMenu();
+
+      setInterval(saveState, 2000);
     }
 
-    function addEditorTab() {
-        const tabType = document.getElementById('tabType').value;
-        const tabName = prompt(`Введите имя для новой вкладки (${tabType}):`, `untitled${++tabCount}.${tabType}`);
-        if (!tabName) return;
+    /*****************
+     * UI: Tree
+     *****************/
+    function renderFileTree(tree, parentElement, currentPath = '') {
+      parentElement.innerHTML = '';
+      for (const name in tree) {
+        const item = tree[name];
+        const fullPath = currentPath ? `${currentPath}/${name}` : name;
+        const isFolder = typeof item.content === 'undefined';
+        const level = currentPath ? currentPath.split('/').length : 0;
 
-        const tabId = `tab-${tabType}-${tabName.replace(/\./g, '-')}-${Date.now()}`;
-        const mode = getModeForType(tabType);
-        
-        const tabItem = document.createElement('li');
-        tabItem.className = 'nav-item';
-        tabItem.role = 'presentation';
-        tabItem.innerHTML = `<button class="nav-link" data-bs-toggle="tab" data-bs-target="#${tabId}-panel" type="button" role="tab">${tabName}<span class="close-tab-btn" onclick="removeEditorTab(event, '${tabId}')">&times;</span></button>`;
-        editorTabsList.appendChild(tabItem);
+        const row = document.createElement('a');
+        row.href = '#';
+        row.className = `list-group-item list-group-item-action bg-dark text-white-50 border-0 ${activeFile === fullPath ? 'active' : ''}`;
+        row.style.paddingLeft = (isFolder ? level : level + 1) + 'rem';
+        row.innerHTML = `<i class="bi bi-${isFolder ? 'folder' : getFileIcon(item.type)} me-2"></i>${name}`;
 
-        const tabPanel = document.createElement('div');
-        tabPanel.className = 'tab-pane fade h-100';
-        tabPanel.id = `${tabId}-panel`;
-        tabPanel.role = 'tabpanel';
-        tabPanel.innerHTML = `<div id="${tabId}-editor"></div>`;
-        editorPanels.appendChild(tabPanel);
-        
-        editors[tabId] = CodeMirror(document.getElementById(`${tabId}-editor`), { ...commonConfig, mode: mode, extraKeys: {"Ctrl-Enter": runCode} });
-
-        const newTab = new bootstrap.Tab(tabItem.querySelector('.nav-link'));
-        newTab.show();
-    }
-
-    function removeEditorTab(event, tabId) {
-        event.stopPropagation();
-        event.preventDefault();
-        
-        const tabItem = event.target.closest('.nav-item');
-        const tabPanel = document.getElementById(`${tabId}-panel`);
-
-        if (tabItem && tabPanel) {
-            tabItem.remove();
-            tabPanel.remove();
-            delete editors[tabId];
-            
-            const firstTab = editorTabsList.querySelector('.nav-item:first-child .nav-link');
-            if (firstTab) {
-                new bootstrap.Tab(firstTab).show();
-            }
+        if (isFolder) {
+          row.addEventListener('click', (e) => e.preventDefault());
+          row.addEventListener('contextmenu', (e) => e.preventDefault());
+          parentElement.appendChild(row);
+          const sub = document.createElement('div');
+          parentElement.appendChild(sub);
+          renderFileTree(item, sub, fullPath);
+        } else {
+          row.addEventListener('click', () => openFile(fullPath));
+          row.addEventListener('contextmenu', (e) => { e.preventDefault(); showFileContextMenu(e, fullPath); });
+          parentElement.appendChild(row);
         }
+      }
     }
 
-    function getModeForType(type) {
-        switch (type) {
-            case 'html':
-                return 'xml';
-            case 'css':
-                return 'css';
-            case 'js':
-                return 'javascript';
-            case 'json':
-                return { name: 'javascript', json: true };
-            case 'txt':
-                return null;
-            default:
-                return 'xml';
+    function getFileIcon(type) {
+      switch (String(type)) {
+        case 'html': return 'filetype-html';
+        case 'css' : return 'filetype-css';
+        case 'js'  : return 'filetype-js';
+        case 'json': return 'filetype-json';
+        case 'txt' : return 'filetype-txt';
+        default: return 'file';
+      }
+    }
+
+    function toggleSidebar() {
+      const el = document.getElementById('sidebar');
+      el.classList.toggle('closed');
+      localStorage.setItem('ide_sidebar_closed', el.classList.contains('closed') ? '1' : '0');
+    }
+
+    /*****************
+     * Tabs & Editors
+     *****************/
+    function createEditorForFile(filePath) {
+      const fileObj = getFileObject(filePath); if (!fileObj) return;
+      fileObj.isOpen = true;
+      const name = filePath.split('/').pop();
+      const tabId = filePath.replace(/[./]/g, '-');
+      const mode = getModeForType(fileObj.type);
+
+      const tabItem = document.createElement('li');
+      tabItem.className = 'nav-item position-relative';
+      tabItem.id = `${tabId}-tab`;
+      tabItem.innerHTML = `<button class="nav-link" id="${tabId}-tab-button" data-bs-toggle="tab" data-bs-target="#${tabId}-panel" type="button" role="tab" onclick="openFile('${filePath}')">${name}<span class="close-tab-btn" title="Закрыть" onclick="removeEditorTab(event, '${filePath}')">&times;</span></button>`;
+      editorTabsList.appendChild(tabItem);
+
+      const panel = document.createElement('div');
+      panel.className = 'tab-pane fade h-100';
+      panel.id = `${tabId}-panel`;
+      panel.role = 'tabpanel';
+      editorPanels.appendChild(panel);
+
+      const editorOptions = {
+        ...commonConfig,
+        mode,
+        value: fileObj.content,
+        extraKeys: {
+          'Ctrl-Enter': runCode,
+          'Ctrl-.': 'closeTag',
+          'Ctrl-Shift-W': (cm)=>wrapWithTag(cm),
+          'Ctrl-Q': function(cm){ cm.foldCode(cm.getCursor()); }
+        },
+        // автозакрытие — из настроек
+        autoCloseTags: autoCloseTagsOption()
+      };
+
+      const cm = CodeMirror(panel, editorOptions);
+
+      // Подключаем Emmet API к редактору
+      if (typeof emmetCodeMirror === 'function') {
+        try { emmetCodeMirror(cm); } catch(_) {}
+      }
+
+      editors[filePath] = cm;
+      cm.on('change', () => setFileContent(filePath, cm.getValue()));
+
+      // Применяем/снимаем Emmet keymap согласно настройке (только HTML/CSS)
+      applyEmmetKeymap(cm, settings.emmetEnabled, fileObj.type);
+    }
+
+    function autoCloseTagsOption(){
+      return settings.autoCloseTagsEnabled
+        ? { whenClosing: true, whenOpening: true, indentTags: true }
+        : false;
+    }
+
+    function applyAutoCloseToAll(){
+      for (const fp in editors){
+        const cm = editors[fp];
+        cm.setOption('autoCloseTags', autoCloseTagsOption());
+      }
+    }
+
+    function applyEmmetKeymap(cm, enabled, fileType){
+      if (cm.__emmetMap) { try { cm.removeKeyMap(cm.__emmetMap); } catch(_) {} cm.__emmetMap = null; }
+      if (!enabled) return;
+      if (fileType !== 'html' && fileType !== 'css') return;
+
+      const map = {
+        'Tab': 'emmet.expand_abbreviation_with_tab',
+        'Enter': 'emmet.insert_formatted_line_break_only'
+      };
+      cm.addKeyMap(map);
+      cm.__emmetMap = map;
+    }
+
+    function applyEmmetToAll(){
+      for (const fp in editors){
+        const cm = editors[fp];
+        const fo = getFileObject(fp);
+        applyEmmetKeymap(cm, settings.emmetEnabled, fo?.type);
+      }
+    }
+
+    function wrapWithTag(cm){
+      const sel = cm.getSelection();
+      const tag = prompt('Тег/аббревиатура для обёртки (например, div):', 'div');
+      if (!tag) return;
+      cm.replaceSelection(`<${tag}>${sel}</${tag}>`, 'around');
+      cm.focus();
+    }
+
+    function openFile(filePath) {
+      activeFile = filePath;
+      if (!editors[filePath]) createEditorForFile(filePath);
+      // activate tab + panel
+      editorPanels.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show','active'));
+      editorTabsList.querySelectorAll('.nav-link').forEach(t => t.classList.remove('active'));
+      const tabId = filePath.replace(/[./]/g, '-');
+      document.getElementById(`${tabId}-panel`)?.classList.add('show','active');
+      document.getElementById(`${tabId}-tab-button`)?.classList.add('active');
+      editors[filePath]?.focus();
+      renderFileTree(fileSystem, fileTreeElement);
+    }
+
+    function removeEditorTab(event, filePath) {
+      if (event) { event.stopPropagation(); event.preventDefault(); }
+      const tabId = filePath.replace(/[./]/g, '-');
+      document.getElementById(`${tabId}-tab`)?.remove();
+      document.getElementById(`${tabId}-panel`)?.remove();
+      delete editors[filePath];
+      const fo = getFileObject(filePath); if (fo) fo.isOpen = false;
+      if (filePath === activeFile) {
+        const rest = editorTabsList.querySelectorAll('.nav-item button');
+        activeFile = rest.length ? (rest[0].getAttribute('onclick').match(/'([^']+)'/)[1]) : null;
+        if (activeFile) openFile(activeFile);
+      }
+    }
+
+    function renderOpenTabs() {
+      editorTabsList.innerHTML = ''; editorPanels.innerHTML = '';
+      (function walk(tree, base = '') {
+        for (const name in tree) {
+          const item = tree[name];
+          const full = base ? `${base}/${name}` : name;
+          const isFolder = typeof item.content === 'undefined';
+          if (isFolder) walk(item, full); else if (item.isOpen) createEditorForFile(full);
         }
+      })(fileSystem);
+    }
+
+    function getFileObject(filePath) {
+      const parts = filePath.split('/');
+      let cur = fileSystem;
+      for (let i = 0; i < parts.length; i++) {
+        if (cur && typeof cur[parts[i]] !== 'undefined') cur = cur[parts[i]]; else return null;
+      }
+      return cur;
+    }
+    function setFileContent(filePath, content) { const fo = getFileObject(filePath); if (fo) { fo.content = content; fo.isOpen = true; } }
+    function getModeForType(type) { switch (String(type)) { case 'html': return 'htmlmixed'; case 'css': return 'css'; case 'js': return 'javascript'; case 'json': return { name: 'javascript', json: true }; default: return null; } }
+
+    /*****************
+     * File ops
+     *****************/
+    function createNewFile() {
+      const fullPath = prompt('Введите путь и имя нового файла (напр., js/app.js):');
+      if (!fullPath) return; const parts = fullPath.split('/'); const fileName = parts.pop();
+      const ext = (fileName.includes('.') ? fileName.split('.').pop() : 'txt');
+      let cur = fileSystem; for (const seg of parts) { if (!cur[seg]) cur[seg] = {}; cur = cur[seg]; }
+      if (cur[fileName]) return alert('Файл уже существует.');
+      cur[fileName] = { content: '', type: ext, path: fullPath, isOpen: true };
+      renderFileTree(fileSystem, fileTreeElement); openFile(fullPath);
+    }
+
+    function createNewFolder() {
+      const fullPath = prompt('Введите путь папки (напр., assets/images):');
+      if (!fullPath) return; const parts = fullPath.split('/'); let cur = fileSystem; for (const seg of parts) { if (!cur[seg]) cur[seg] = {}; cur = cur[seg]; }
+      renderFileTree(fileSystem, fileTreeElement);
+    }
+
+    function showFileContextMenu(e, filePath) {
+      const menu = document.createElement('div');
+      menu.className = 'dropdown-menu show bg-dark border-secondary';
+      menu.style.position = 'fixed'; menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px';
+      menu.innerHTML = `<button class="dropdown-item text-white-50 bg-dark" onclick="renameFile('${filePath}')">Переименовать</button>
+                        <button class="dropdown-item text-danger bg-dark" onclick="deleteFile('${filePath}')">Удалить</button>`;
+      document.body.appendChild(menu);
+      const remove = () => { if (document.body.contains(menu)) document.body.removeChild(menu); document.removeEventListener('click', remove); };
+      setTimeout(() => document.addEventListener('click', remove), 0);
+    }
+
+    function renameFile(oldPath) {
+      const oldName = oldPath.split('/').pop();
+      const newName = prompt(`Новое имя для ${oldName}:`, oldName);
+      if (!newName || newName === oldName) return;
+      const parts = oldPath.split('/'); parts.pop(); const parentPath = parts.join('/');
+      let parent = fileSystem; if (parentPath) parent = getFileObject(parentPath); if (!parent) return;
+      const fileObj = parent[oldName]; const newPath = parentPath ? `${parentPath}/${newName}` : newName;
+      parent[newName] = { ...fileObj, path: newPath }; delete parent[oldName];
+      if (editors[oldPath]) { const ed = editors[oldPath]; delete editors[oldPath]; editors[newPath] = ed; }
+      const oldId = oldPath.replace(/[./]/g, '-'); const nid = newPath.replace(/[./]/g, '-');
+      const btn = document.getElementById(`${oldId}-tab-button`); if (btn) { btn.innerHTML = `${newName}<span class="close-tab-btn" onclick="removeEditorTab(event, '${newPath}')">&times;</span>`; btn.id = `${nid}-tab-button`; btn.setAttribute('onclick', `openFile('${newPath}')`); btn.dataset.bsTarget = `#${nid}-panel`; }
+      const item = document.getElementById(`${oldId}-tab`); if (item) item.id = `${nid}-tab`;
+      const panel = document.getElementById(`${oldId}-panel`); if (panel) panel.id = `${nid}-panel`;
+      if (activeFile === oldPath) activeFile = newPath;
+      renderFileTree(fileSystem, fileTreeElement);
+    }
+
+    function deleteFile(filePath) {
+      if (!confirm(`Удалить ${filePath}?`)) return;
+      const parts = filePath.split('/'); const name = parts.pop(); const parentPath = parts.join('/');
+      let parent = fileSystem; if (parentPath) parent = getFileObject(parentPath);
+      if (parent && parent[name]) { delete parent[name]; removeEditorTab(null, filePath); renderFileTree(fileSystem, fileTreeElement); }
+    }
+
+    /*****************
+     * Build & Run
+     *****************/
+    function collectFiles() {
+      const out = { html: {}, css: {}, js: {}, other: {} };
+      (function walk(tree, base = '') {
+        for (const name in tree) {
+          const item = tree[name]; const full = base ? `${base}/${name}` : name;
+          const isFolder = typeof item.content === 'undefined';
+          if (isFolder) walk(item, full); else {
+            if (item.type === 'html') out.html[full] = item.content;
+            else if (item.type === 'css') out.css[full] = item.content;
+            else if (item.type === 'js') out.js[full] = item.content;
+            else out.other[full] = item.content;
+          }
+        }
+      })(fileSystem);
+      return out;
+    }
+
+    function buildFullHtml() {
+      const trim = document.getElementById('trimWhitespaceCheckbox')?.checked;
+      const files = collectFiles();
+      const htmlContent = files.html['index.html'] || Object.values(files.html)[0] || '<div></div>';
+      const cssContent  = Object.values(files.css).map(s => trim ? s.replace(/[\t ]+$/gm, '') : s).join('\n');
+      const jsContent   = Object.values(files.js).map(s => trim ? s.replace(/[\t ]+$/gm, '') : s).join('\n');
+
+      const headLibs = libraries.filter(l => l.position === 'head').map(libToTag).join('');
+      const bodyLibs = libraries.filter(l => l.position === 'body').map(libToTag).join('');
+      const favLink  = (favicon && favicon.href) ? `<link rel="icon" href="${favicon.href}" type="${favicon.type || 'image/png'}">` : '';
+
+      const consoleBridge = `\n<script>\n  const _send = (t, args) => { try { const msg = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' '); window.opener && window.opener.postMessage({ type: t, message: msg }, '*'); } catch(e){} };\n  ['log','warn','error','info'].forEach(fn => { const orig = console[fn]; console[fn] = function(){ _send(fn, arguments); orig && orig.apply(console, arguments); }; });\n  window.addEventListener('error', e => _send('error', [e.message]));\n  window.addEventListener('unhandledrejection', e => _send('error', [e.reason?.message || String(e.reason)]));\n<\/script>`;
+
+      const jsExec = `\n<script>try {\n${jsContent}\n} catch(e) { console.error(e && e.stack || e); }<\/script>`;
+
+      return `<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">${favLink}${headLibs}<style>${cssContent}</style></head><body>${htmlContent}${bodyLibs}${consoleBridge}${jsExec}</body></html>`;
     }
 
     function runCode() {
-        const trimWhitespace = document.getElementById("trimWhitespaceCheckbox").checked;
-        let htmlCode = editors.html.getValue();
-        let cssCode = editors.css.getValue();
-        let jsCode = editors.js.getValue();
-        
-        if (trimWhitespace) {
-            htmlCode = htmlCode.trim();
-            cssCode = cssCode.trim();
-            jsCode = jsCode.trim();
-        }
-
-        for (const key in editors) {
-            if (key.startsWith('tab-')) {
-                const parts = key.split('-');
-                const editorType = parts[1];
-                
-                if (editorType === 'css') {
-                    cssCode += `\n${editors[key].getValue()}`;
-                } else if (editorType === 'js') {
-                    jsCode += `\n${editors[key].getValue()}`;
-                }
-            }
-        }
-
-        const headLibraries = libraries
-            .filter(lib => lib.position === "head")
-            .map(lib => `<script src="${lib.url}" ${lib.attributes}><\/script>`).join("");
-        
-        const bodyLibraries = libraries
-            .filter(lib => lib.position === "body")
-            .map(lib => `<script src="${lib.url}" ${lib.attributes}><\/script>`).join("");
-
-        const consoleScript = `
-            <script>
-                const _log = (type, args) => {
-                    try {
-                        const message = Array.from(args).map(arg => {
-                            return typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg);
-                        });
-                        window.opener?.postMessage({ type: type, message: message.join(" ") }, "*");
-                    } catch (e) {
-                        // ignore
-                    }
-                };
-                window.console.log = (...args) => _log("log", args);
-                window.console.error = (...args) => _log("error", args);
-                window.console.warn = (...args) => _log("warn", args);
-                window.addEventListener("error", (e) => _log("error", [e.message]));
-            <\/script>
-        `;
-
-        const jsExecutionScript = `<script>try { ${jsCode} } catch(e) { console.error(e.message); }<\/script>`;
-        const faviconLink = favicon.href ? `<link rel="icon" href="${favicon.href}" type="${favicon.type}">` : "";
-
-        const newWindow = window.open();
-        if (newWindow) {
-            newWindow.document.write(`<!DOCTYPE html><html><head>${faviconLink}${consoleScript}<style>${cssCode}</style>${headLibraries}</head><body>${htmlCode}${bodyLibraries}${jsExecutionScript}</body></html>`);
-            newWindow.document.close();
-        } else {
-            alert("Браузер заблокировал всплывающее окно.");
-        }
-    }
-
-    window.addEventListener("message", (event) => {
-        if (!event.data || typeof event.data.message === 'undefined') return;
-        
-        const { type, message } = event.data;
-        let color = "#8be9fd";
-        let label = "LOG";
-        
-        if (type === "error") {
-            color = "#ff5555";
-            label = "ERR";
-        } else if (type === "warn") {
-            color = "#f1fa8c";
-            label = "WARN";
-        }
-
-        const logItem = document.createElement("div");
-        logItem.textContent = `[${label}] ${message}`;
-        logItem.style.cssText = `color: ${color}; border-bottom: 1px solid #333; padding: 2px 5px;`;
-        consoleElement.appendChild(logItem);
-        
-        const consoleModal = bootstrap.Modal.getInstance(document.getElementById('consoleModal'));
-        if (!consoleModal) {
-            showConsoleModal();
-        }
-        
-        consoleElement.scrollTop = consoleElement.scrollHeight;
-    });
-
-    function toggleConsole() {
-        consoleElement.style.display = (consoleElement.style.display === "none" || consoleElement.style.display === "") ? "block" : "none";
-    }
-
-    function confirmClearCode() {
-        if (confirm("Вы уверены, что хотите очистить весь проект? Это действие нельзя отменить.")) {
-            clearCode();
-        }
-    }
-    
-    function clearCode() {
-        for (const key in editors) {
-            editors[key].setValue('');
-        }
-        
-        const dynamicTabs = editorTabsList.querySelectorAll('.nav-item:not(:first-child):not(:nth-child(2)):not(:nth-child(3))');
-        dynamicTabs.forEach(tab => {
-            const tabId = tab.querySelector('button').dataset.bsTarget.slice(1).replace('-panel', '');
-            document.getElementById(`${tabId}-panel`).remove();
-            tab.remove();
-            delete editors[tabId];
-        });
-
-        libraries = [];
-        updateLibraryList();
-        
-        favicon = {};
-        removeFavicon();
-        
-        alert("Проект очищен!");
+      const html = buildFullHtml();
+      const w = window.open('about:blank', '_blank');
+      if (!w) return alert('Браузер заблокировал всплывающее окно. Разрешите pop-up для домена.');
+      w.document.open(); w.document.write(html); w.document.close();
     }
 
     function saveCode() {
-        const fullCode = `<!DOCTYPE html>
-<html>
-<head>
-    <style>${editors.css.getValue()}</style>
-</head>
-<body>
-    ${editors.html.getValue()}
-    <script>${editors.js.getValue()}<\/script>
-</body>
-</html>`;
-        
-        const blob = new Blob([fullCode], { type: "text/html" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "index.html";
-        a.click();
+      const html = buildFullHtml();
+      const blob = new Blob([html], { type: 'text/html' });
+      saveAs(blob, 'index.html');
     }
-    
-    function saveZip() {
-        const zip = new JSZip();
 
-        const tabItems = editorTabsList.querySelectorAll('.nav-link');
-        tabItems.forEach(tab => {
-            const tabId = tab.dataset.bsTarget.slice(1).replace('-panel', '');
-            const editorInstance = editors[tabId];
-            if (editorInstance) {
-                const tabName = tab.textContent.replace('×', '').trim();
-                zip.file(tabName, editorInstance.getValue());
-            }
-        });
-        
-        if (libraries.length > 0) {
-            let librariesContent = '';
-            libraries.forEach(lib => {
-                const name = lib.isLocal ? lib.fileName : lib.url;
-                librariesContent += `URL: ${name}, Position: ${lib.position}, Attributes: ${lib.attributes}\n`;
-            });
-            zip.file("libraries.txt", librariesContent);
+    async function saveZip() {
+      const zip = new JSZip();
+      (function walk(tree, folder, base = '') {
+        for (const name in tree) {
+          const item = tree[name]; const isFolder = typeof item.content === 'undefined';
+          if (isFolder) { const sub = folder.folder(name); walk(item, sub, base ? `${base}/${name}` : name); }
+          else { folder.file(name, item.content); }
         }
+      })(fileSystem, zip);
 
-        zip.generateAsync({type:"blob"}).then(function(content) {
-            saveAs(content, "project.zip");
-            alert("Проект сохранен в project.zip!");
-        });
+      if (libraries.length) {
+        let txt = 'Подключенные библиотеки:\n\n';
+        libraries.forEach(l => { const n = l.isLocal ? l.fileName : l.url; txt += `${l.kind.toUpperCase()}: ${n}\nПозиция: ${l.position}\nАтрибуты: ${l.attributes || 'нет'}\n\n`; });
+        zip.file('libraries.txt', txt);
+      }
+      if (favicon && favicon.href) {
+        try {
+          if (String(favicon.href).startsWith('data:')) { const base64 = favicon.href.split(',')[1]; const ext = (favicon.type || 'image/png').split('/')[1]; zip.file(`favicon.${ext}`, base64, { base64: true }); }
+          else zip.file('favicon_info.txt', `Иконка: ${favicon.href} (Тип: ${favicon.type})\n`);
+        } catch (e) { zip.file('favicon_info.txt', `Не удалось добавить favicon (${e?.message}). Ссылка: ${favicon.href}\n`); }
+      }
+      try { const blob = await zip.generateAsync({ type: 'blob' }); saveAs(blob, 'project.zip'); } catch (e) { alert('Ошибка сохранения ZIP: ' + (e?.message || e)); }
     }
 
-    function importFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const content = e.target.result;
-            const htmlMatch = /<body[^>]*>([\s\S]*)<\/body>/i.exec(content);
-            const cssMatch = /<style[^>]*>([\s\S]*)<\/style>/i.exec(content);
-            const jsMatch = /<script[^>]*>([\s\S]*)<\/script>/i.exec(content);
-
-            editors.html.setValue(htmlMatch ? htmlMatch[1].trim() : '');
-            editors.css.setValue(cssMatch ? cssMatch[1].trim() : '');
-            editors.js.setValue(jsMatch ? jsMatch[1].trim() : '');
-        };
-        reader.readAsText(file);
+    /*****************
+     * Import
+     *****************/
+    function importFile(ev) {
+      const file = ev.target.files?.[0]; if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = String(e.target.result || '');
+        const htmlMatch = /<body[^>]*>([\s\S]*?)<\/body>/i.exec(content);
+        const cssMatch  = /<style[^>]*>([\s\S]*?)<\/style>/i.exec(content);
+        const jsMatch   = /<script[^>]*>([\s\S]*?)<\/script>/i.exec(content);
+        ensureDefaultFiles();
+        getFileObject('index.html').content = htmlMatch ? htmlMatch[1].trim() : '';
+        getFileObject('style.css').content   = cssMatch ? cssMatch[1].trim() : '';
+        getFileObject('main.js').content     = jsMatch ? jsMatch[1].trim() : '';
+        // refresh editors if open
+        if (editors['index.html']) editors['index.html'].setValue(getFileObject('index.html').content);
+        if (editors['style.css'])   editors['style.css'].setValue(getFileObject('style.css').content);
+        if (editors['main.js'])     editors['main.js'].setValue(getFileObject('main.js').content);
+        renderFileTree(fileSystem, fileTreeElement);
+        alert('HTML-файл импортирован!');
+      };
+      reader.readAsText(file);
     }
-    
-    function closeModal(modalId) {
-        const modalElement = document.getElementById(modalId);
-        const modalInstance = bootstrap.Modal.getInstance(modalElement);
-        if (modalInstance) {
-            modalInstance.hide();
+
+    function ensureDefaultFiles() {
+      if (!getFileObject('index.html')) fileSystem['index.html'] = { content:'', type:'html', path:'index.html', isOpen:true };
+      if (!getFileObject('style.css'))  fileSystem['style.css']  = { content:'', type:'css',  path:'style.css',  isOpen:true };
+      if (!getFileObject('main.js'))    fileSystem['main.js']    = { content:'', type:'js',   path:'main.js',    isOpen:true };
+    }
+
+    /*****************
+     * Settings: favicon & libs
+     *****************/
+    function setFavicon() {
+      const urlI = document.getElementById('faviconUrl');
+      const fileI = document.getElementById('faviconFile');
+      const typeI = document.getElementById('faviconType');
+      if (urlI.value.trim()) { favicon = { href: urlI.value.trim(), type: typeI.value }; updateFaviconDisplay(favicon.href, 'URL'); }
+      else if (fileI.files?.length) { const f = fileI.files[0]; const r = new FileReader(); r.onload = (e) => { favicon = { href: String(e.target.result), type: typeI.value }; updateFaviconDisplay(favicon.href, f.name); }; r.readAsDataURL(f); }
+      else alert('Введите URL или выберите файл.');
+    }
+    function removeFavicon() { favicon = {}; document.getElementById('faviconDisplay').style.display = 'none'; document.getElementById('faviconUrl').value=''; document.getElementById('faviconFile').value=''; }
+    function updateFaviconDisplay(href, info) { document.getElementById('faviconPreview').src = href; document.getElementById('faviconInfo').textContent = info; document.getElementById('faviconDisplay').style.display = 'inline-flex'; }
+
+    function addLibrary() {
+      const urlI = document.getElementById('libUrl');
+      const fileI = document.getElementById('libFile');
+      const pos = document.getElementById('libPosition').value;
+      const attrs = document.getElementById('libAttributes').value.trim();
+      if (urlI.value.trim()) {
+        const url = urlI.value.trim(); libraries.push({ url, position: pos, attributes: attrs, isLocal: false, kind: guessKind(url, attrs) });
+        urlI.value=''; fileI.value=''; document.getElementById('libAttributes').value=''; updateLibraryList();
+      } else if (fileI.files?.length) {
+        const f = fileI.files[0]; const blobUrl = URL.createObjectURL(f); libraries.push({ url: blobUrl, fileName: f.name, position: pos, attributes: attrs, isLocal: true, kind: guessKind(f.name, attrs) });
+        urlI.value=''; fileI.value=''; document.getElementById('libAttributes').value=''; updateLibraryList();
+      } else alert('Введите URL или выберите файл.');
+    }
+    function removeLibrary(i) { if (libraries[i]?.isLocal) URL.revokeObjectURL(libraries[i].url); libraries.splice(i,1); updateLibraryList(); }
+    function updateLibraryList() {
+      libraryListElement.innerHTML = '';
+      libraries.forEach((lib, i) => {
+        const badge = document.createElement('span'); badge.className = 'badge bg-secondary d-inline-flex align-items-center';
+        const name = lib.isLocal ? lib.fileName : lib.url; badge.innerHTML = `${lib.kind.toUpperCase()} · ${name} (${lib.position}) <button class="btn-close btn-close-white ms-2" style="font-size:.7em" onclick="removeLibrary(${i})"></button>`;
+        libraryListElement.appendChild(badge);
+      });
+    }
+    function guessKind(nameOrUrl, attrs) { if (/\.css(\?|$)/i.test(nameOrUrl) || /rel=\"?stylesheet\"?/i.test(attrs)) return 'css'; return 'js'; }
+    function libToTag(lib) { const attr = lib.attributes ? ' ' + lib.attributes : ''; if (lib.kind === 'css') return `<link rel="stylesheet" href="${lib.url}"${attr}>`; return `<script src="${lib.url}"${attr}><\/script>`; }
+
+    /*****************
+     * Console helpers
+     *****************/
+    function showConsoleModal(){ new bootstrap.Modal(document.getElementById('consoleModal')).show(); }
+    function clearConsole(){ consoleElement.innerHTML=''; }
+    function appendConsole(type, msg){
+      const pre = document.createElement('pre'); pre.className = 'm-0';
+      const time = new Date().toLocaleTimeString();
+      const prefix = (type||'log').toUpperCase().padEnd(5, ' ');
+      pre.textContent = `[${time}] ${prefix} ${msg}`;
+      if (type === 'warn') pre.style.color = '#e0a800';
+      if (type === 'error') pre.style.color = '#ff6b6b';
+      consoleElement.appendChild(pre); consoleElement.scrollTop = consoleElement.scrollHeight;
+    }
+    function copyConsoleToClipboard(){ const txt = consoleElement.innerText; navigator.clipboard.writeText(txt).then(()=>alert('Лог скопирован!')).catch(()=>alert('Ошибка копирования.')); }
+
+    /*****************
+     * Persistence
+     *****************/
+    function saveState(){
+      for (const k in editors){ const fo = getFileObject(k); if (fo) fo.content = editors[k].getValue(); }
+      const state = { fileSystem, libraries, favicon, activeFile, sidebarClosed: document.getElementById('sidebar').classList.contains('closed') ? 1 : 0 };
+      localStorage.setItem('online_ide_state_v2', JSON.stringify(state));
+    }
+    function loadState(){
+      try{
+        const raw = localStorage.getItem('online_ide_state_v2');
+        if (raw){
+          const s = JSON.parse(raw);
+          if (s.fileSystem) fileSystem = s.fileSystem;
+          libraries = s.libraries||[];
+          favicon = s.favicon||{};
+          activeFile = s.activeFile || 'index.html';
+          if (s.sidebarClosed) document.getElementById('sidebar').classList.add('closed');
+          updateLibraryList();
+          if (favicon.href) updateFaviconDisplay(favicon.href, favicon.href.startsWith('data:') ? 'Локальный файл' : 'URL');
+        } else {
+          if (localStorage.getItem('ide_sidebar_closed') === '1') document.getElementById('sidebar').classList.add('closed');
         }
+      }catch(e){ console.warn('Не удалось загрузить состояние:', e?.message || e); }
     }
 
-    function saveState() {
-        const state = {
-            editors: {},
-            libraries: libraries,
-            favicon: favicon
-        };
+    /*****************
+     * Misc
+     *****************/
+    function showSettingsModal(){ new bootstrap.Modal(document.getElementById('settingsModal')).show(); }
+    function closeModal(id){ const el = document.getElementById(id); const inst = bootstrap.Modal.getInstance(el); inst?.hide(); }
 
-        for (const key in editors) {
-            state.editors[key] = editors[key].getValue();
-        }
-
-        localStorage.setItem('online_editor_state', JSON.stringify(state));
+    function confirmClearProject(){ if (confirm('Очистить весь проект? Это действие нельзя отменить.')) clearProject(); }
+    function clearProject(){
+      Object.keys(editors).forEach(fp => removeEditorTab(null, fp));
+      fileSystem = {
+        'index.html': { content: '<h1>Привет, мир!</h1>', type: 'html', path: 'index.html', isOpen: false },
+        'style.css':  { content: 'body { font-family: sans-serif; background:#282a36; color:#f8f8f2; }', type: 'css', path: 'style.css', isOpen: false },
+        'main.js':    { content: 'console.log("Приложение запущено!")', type: 'js', path: 'main.js', isOpen: false }
+      };
+      libraries = []; favicon = {}; activeFile = 'index.html';
+      updateLibraryList(); removeFavicon(); renderFileTree(fileSystem, fileTreeElement); renderOpenTabs(); saveState(); alert('Проект очищен!');
     }
 
-    function loadState() {
-        const savedState = localStorage.getItem('online_editor_state');
-        if (savedState) {
-            const state = JSON.parse(savedState);
-            
-            // Загрузка содержимого редакторов
-            for (const key in state.editors) {
-                if (editors[key]) {
-                    editors[key].setValue(state.editors[key]);
-                }
-            }
-            
-            // Загрузка библиотек
-            libraries = state.libraries || [];
-            updateLibraryList();
-
-            // Загрузка favicon
-            if (state.favicon && state.favicon.href) {
-                favicon = state.favicon;
-                updateFaviconDisplay(favicon.href, favicon.href.startsWith('data:') ? 'Локальный файл' : 'URL');
-            }
-        }
+    function setupTripleClickMenu(){
+      let clicks = 0; let timer = null;
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('.modal')) return; clicks++; clearTimeout(timer);
+        timer = setTimeout(() => { if (clicks >= 3) new bootstrap.Modal(document.getElementById('contextMenuModal')).show(); clicks = 0; }, 300);
+      });
     }
 
-    window.addEventListener('load', loadState);
-    setInterval(saveState, 2000);
-</script>
-
+    document.addEventListener('DOMContentLoaded', initIDE);
+  </script>
 </body>
 </html>
