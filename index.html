@@ -247,6 +247,88 @@
     const SETTINGS_KEY = 'online_ide_settings_v2';
     let settings = { emmetEnabled: true, autoCloseTagsEnabled: true };
 
+    const defaultHtmlContent = `<div class="container">
+  <h1>Привет, адаптивный мир!</h1>
+  <p>Этот проект по умолчанию адаптируется под разные экраны.</p>
+  <div class="box-container">
+    <div class="box">Элемент 1</div>
+    <div class="box">Элемент 2</div>
+    <div class="box">Элемент 3</div>
+  </div>
+</div>`;
+
+    const defaultCssContent = `/* Общие стили для body */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: #282a36;
+  color: #f8f8f2;
+  margin: 0;
+  padding: 1rem;
+  line-height: 1.6;
+}
+
+/* Контейнер для центрирования контента */
+.container {
+  max-width: 1200px; /* Максимальная ширина для больших экранов (ноутбуки, ТВ) */
+  margin: 0 auto;
+  padding: 1rem;
+  text-align: center;
+}
+
+h1 {
+  color: #8be9fd;
+}
+
+/* Гибкий контейнер для элементов */
+.box-container {
+  display: flex;
+  flex-wrap: wrap; /* Позволяет элементам переноситься на новую строку */
+  gap: 1rem; /* Пространство между элементами */
+  justify-content: center;
+  margin-top: 2rem;
+}
+
+/* Стили для элементов */
+.box {
+  background: #44475a;
+  border-radius: 8px;
+  padding: 2rem;
+  flex-basis: 300px; /* Базовая ширина элемента */
+  flex-grow: 1; /* Позволяет элементу расти */
+  transition: transform 0.2s ease;
+}
+
+.box:hover {
+    transform: translateY(-5px);
+}
+
+/* --- Адаптивность --- */
+
+/* Планшеты (экраны до 768px) */
+@media (max-width: 768px) {
+  h1 {
+    font-size: 2rem;
+  }
+  .box {
+    flex-basis: 250px; /* Уменьшаем базовую ширину */
+  }
+}
+
+/* Телефоны (экраны до 480px) */
+@media (max-width: 480px) {
+  body {
+    padding: 0.5rem;
+  }
+  h1 {
+    font-size: 1.5rem;
+  }
+  .box-container {
+    flex-direction: column; /* Элементы встают друг под другом */
+  }
+}`;
+
+    const defaultJsContent = 'console.log("Адаптивный проект запущен!");';
+
     function loadSettings(){
       try {
         const raw = localStorage.getItem(SETTINGS_KEY);
@@ -273,9 +355,9 @@
 
     // Tree: files are objects with {content, type, path, isOpen}; folders are plain objects (no content)
     let fileSystem = {
-      'index.html': { content: '<h1>Привет, мир!</h1>', type: 'html', path: 'index.html', isOpen: true },
-      'style.css': { content: 'body { font-family: sans-serif; background:#282a36; color:#f8f8f2; }', type: 'css', path: 'style.css', isOpen: true },
-      'main.js'  : { content: 'console.log("Приложение запущено!")', type: 'js', path: 'main.js', isOpen: true }
+      'index.html': { content: defaultHtmlContent, type: 'html', path: 'index.html', isOpen: true },
+      'style.css': { content: defaultCssContent, type: 'css', path: 'style.css', isOpen: true },
+      'main.js'  : { content: defaultJsContent, type: 'js', path: 'main.js', isOpen: true }
     };
 
     let libraries = []; // {url, fileName?, position: 'head'|'body', attributes: string, isLocal: bool, kind: 'js'|'css'}
@@ -601,8 +683,16 @@
       const trim = document.getElementById('trimWhitespaceCheckbox')?.checked;
       const files = collectFiles();
       const htmlContent = files.html['index.html'] || Object.values(files.html)[0] || '<div></div>';
-      const cssContent  = Object.values(files.css).map(s => trim ? s.replace(/[\t ]+$/gm, '') : s).join('\n');
-      const jsContent   = Object.values(files.js).map(s => trim ? s.replace(/[\t ]+$/gm, '') : s).join('\n');
+      
+      const cssStyles = Object.entries(files.css).map(([path, content]) => {
+        const processedContent = trim ? content.replace(/[\t ]+$/gm, '') : content;
+        return `<style data-path="${path}">\n${processedContent}\n</style>`;
+      }).join('\n');
+
+      const jsScripts = Object.entries(files.js).map(([path, content]) => {
+        const processedContent = trim ? content.replace(/[\t ]+$/gm, '') : content;
+        return `<script data-path="${path}">\n/* --- Start of ${path} --- */\ntry {\n${processedContent}\n} catch(e) { console.error('Error from ${path}:', e); }\n/* --- End of ${path} --- */\n<\/script>`;
+      }).join('\n');
 
       const headLibs = libraries.filter(l => l.position === 'head').map(libToTag).join('');
       const bodyLibs = libraries.filter(l => l.position === 'body').map(libToTag).join('');
@@ -610,9 +700,7 @@
 
       const consoleBridge = `\n<script>\n  const _send = (t, args) => { try { const msg = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a)).join(' '); window.opener && window.opener.postMessage({ type: t, message: msg }, '*'); } catch(e){} };\n  ['log','warn','error','info'].forEach(fn => { const orig = console[fn]; console[fn] = function(){ _send(fn, arguments); orig && orig.apply(console, arguments); }; });\n  window.addEventListener('error', e => _send('error', [e.message]));\n  window.addEventListener('unhandledrejection', e => _send('error', [e.reason?.message || String(e.reason)]));\n<\/script>`;
 
-      const jsExec = `\n<script>try {\n${jsContent}\n} catch(e) { console.error(e && e.stack || e); }<\/script>`;
-
-      return `<!DOCTYPE html><html lang=\"ru\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">${favLink}${headLibs}<style>${cssContent}</style></head><body>${htmlContent}${bodyLibs}${consoleBridge}${jsExec}</body></html>`;
+      return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">${favLink}${headLibs}${cssStyles}</head><body>${htmlContent}${bodyLibs}${consoleBridge}${jsScripts}</body></html>`;
     }
 
     function runCode() {
@@ -678,9 +766,9 @@
     }
 
     function ensureDefaultFiles() {
-      if (!getFileObject('index.html')) fileSystem['index.html'] = { content:'', type:'html', path:'index.html', isOpen:true };
-      if (!getFileObject('style.css'))  fileSystem['style.css']  = { content:'', type:'css',  path:'style.css',  isOpen:true };
-      if (!getFileObject('main.js'))    fileSystem['main.js']    = { content:'', type:'js',   path:'main.js',    isOpen:true };
+      if (!getFileObject('index.html')) fileSystem['index.html'] = { content:defaultHtmlContent, type:'html', path:'index.html', isOpen:true };
+      if (!getFileObject('style.css'))  fileSystem['style.css']  = { content:defaultCssContent, type:'css',  path:'style.css',  isOpen:true };
+      if (!getFileObject('main.js'))    fileSystem['main.js']    = { content:defaultJsContent, type:'js',   path:'main.js',    isOpen:true };
     }
 
     /*****************
@@ -830,9 +918,9 @@
     function clearProject(){
       Object.keys(editors).forEach(fp => removeEditorTab(null, fp));
       fileSystem = {
-        'index.html': { content: '<h1>Привет, мир!</h1>', type: 'html', path: 'index.html', isOpen: false },
-        'style.css':  { content: 'body { font-family: sans-serif; background:#282a36; color:#f8f8f2; }', type: 'css', path: 'style.css', isOpen: false },
-        'main.js':    { content: 'console.log("Приложение запущено!")', type: 'js', path: 'main.js', isOpen: false }
+        'index.html': { content: defaultHtmlContent, type: 'html', path: 'index.html', isOpen: false },
+        'style.css':  { content: defaultCssContent, type: 'css', path: 'style.css', isOpen: false },
+        'main.js':    { content: defaultJsContent, type: 'js', path: 'main.js', isOpen: false }
       };
       libraries = []; favicon = {}; activeFile = 'index.html';
       updateLibraryList(); removeFavicon(); renderFileTree(fileSystem, fileTreeElement); renderOpenTabs(); saveState(); alert('Проект очищен!');
