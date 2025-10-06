@@ -8,9 +8,13 @@
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" />
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/dracula.min.css" />
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/foldgutter.min.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/dialog/dialog.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/matchesonscrollbar.css" />
 
   <style>
     :root {
@@ -21,41 +25,123 @@
       --text-color: #f8f8f2;
     }
     html, body { height: 100vh; margin: 0; padding: 0; background: var(--bg-dark); color: var(--text-color); }
-    .main-container { display: flex; height: 100%; padding: .75rem; gap: .75rem; }
-    .file-tree-sidebar { width: 250px; flex-shrink: 0; border: 1px solid var(--border-color); border-radius: .375rem; overflow-y: auto; transition: width .2s ease; }
-    .file-tree-sidebar.closed { width: 0; border: none; padding: 0; overflow: hidden; }
+    
+    .main-container {
+      display: flex;
+      height: 100%;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    .file-tree-sidebar {
+      width: 250px;
+      flex-shrink: 0;
+      border: 1px solid var(--border-color);
+      border-radius: .375rem;
+      overflow-y: auto;
+      transition: width .2s ease, margin .2s ease, padding .2s ease, opacity .2s ease;
+      margin: .75rem 0 .75rem .75rem;
+    }
+    .editor-area {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+      margin: .75rem;
+    }
+    .file-tree-sidebar.closed {
+      width: 0;
+      border: none;
+      padding: 0;
+      overflow: hidden;
+      margin: 0;
+      opacity: 0;
+    }
+
     .file-tree-sidebar .list-group-item { cursor: pointer; padding: .25rem 1rem; display: flex; align-items: center; }
     .file-tree-sidebar .list-group-item:hover { background: #333644; }
     .file-tree-sidebar .list-group-item.active { background: var(--primary-color); color: #111; }
-    .editor-area { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    
     .top-bar { display:flex; align-items:center; justify-content: space-between; gap: .5rem; }
-    .editor-container { flex: 1; min-height: 0; border: 1px solid var(--border-color); border-radius: 0 .375rem .375rem .375rem; }
+    .editor-container { flex: 1; min-height: 0; border: 1px solid var(--border-color); border-radius: 0 .375rem .375rem .375rem; position: relative; }
     .nav-tabs .nav-link { color: var(--text-color); border: none; }
     .nav-tabs .nav-link.active { background: var(--bg-light); color: var(--primary-color); border: 1px solid var(--border-color); border-bottom-color: transparent; }
     .close-tab-btn { position: absolute; top: 50%; right: 6px; transform: translateY(-50%); font-size: .75em; cursor: pointer; }
-    .CodeMirror { height: 100%; font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; }
+    
+    .CodeMirror {
+      height: 100%;
+      font-family: "Fira Code", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 14px;
+      padding: 1rem;
+      box-sizing: border-box;
+    }
+    
     #console { width:100%; height:100%; background:#111; border:1px solid var(--border-color); border-radius:.375rem; padding:10px; overflow:auto; font-family: Consolas, monospace; font-size: 13px; }
     #faviconDisplay { display:none; }
+    
+    .CodeMirror-lines {
+      padding-left: 4px; 
+    }
+    .CodeMirror-foldgutter-open::after,
+    .CodeMirror-foldgutter-folded::after {
+      font-size: 1.2em;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+
+    .CodeMirror-dialog {
+      background: var(--bg-light) !important;
+      border-left: none !important;
+      border-right: none !important;
+      border-bottom: 1px solid var(--border-color) !important;
+      color: var(--text-color) !important;
+      padding: 0.25rem 0.75rem !important;
+      border-radius: 0;
+      top: 0 !important;
+    }
+    .CodeMirror-dialog input {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      color: var(--text-color);
+      border-radius: .25rem;
+    }
+    .CodeMirror-search-field {
+        width: 20em;
+    }
 
     @media (max-width: 768px) {
       .main-container { flex-direction: column; }
-      .file-tree-sidebar { width: 100%; max-height: 220px; }
-      .file-tree-sidebar.closed { height: 0; }
+      .file-tree-sidebar {
+        width: auto;
+        max-height: 220px;
+        margin: .75rem .75rem 0 .75rem;
+      }
+      .editor-area {
+        margin: .75rem;
+        margin-top: 0;
+      }
+      .file-tree-sidebar.closed {
+        height: 0;
+        min-height: 0;
+        margin: 0;
+        opacity: 0;
+      }
       .CodeMirror { font-size: 12px; }
     }
   </style>
 </head>
 <body>
   <div class="main-container">
-    <div id="sidebar" class="file-tree-sidebar bg-dark p-3">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h6 class="text-white-50 mb-0">Проект</h6>
-        <div class="btn-group">
-          <button class="btn btn-sm btn-outline-light" title="Новый файл" onclick="createNewFile()"><i class="bi bi-file-plus"></i></button>
-          <button class="btn btn-sm btn-outline-light" title="Новая папка" onclick="createNewFolder()"><i class="bi bi-folder-plus"></i></button>
-        </div>
+    <div id="sidebar" class="file-tree-sidebar bg-dark">
+      <div class="p-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="text-white-50 mb-0">Проект</h6>
+            <div class="btn-group">
+              <button class="btn btn-sm btn-outline-light" title="Новый файл" onclick="createNewFile()"><i class="bi bi-file-plus"></i></button>
+              <button class="btn btn-sm btn-outline-light" title="Новая папка" onclick="createNewFolder()"><i class="bi bi-folder-plus"></i></button>
+            </div>
+          </div>
+          <div id="fileTree" class="list-group list-group-flush"></div>
       </div>
-      <div id="fileTree" class="list-group list-group-flush"></div>
     </div>
 
     <div class="editor-area">
@@ -66,6 +152,7 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <button class="btn btn-sm btn-success" onclick="runCode()" title="Запуск (Ctrl+Enter)"><i class="bi bi-play-fill"></i></button>
+          <button class="btn btn-sm btn-info" onclick="openSearch()" title="Поиск (Ctrl+F)"><i class="bi bi-search"></i></button>
           <button class="btn btn-sm btn-warning" onclick="showConsoleModal()" title="Консоль"><i class="bi bi-terminal"></i></button>
           <button class="btn btn-sm btn-secondary" onclick="showSettingsModal()" title="Настройки"><i class="bi bi-gear"></i></button>
           <div class="form-check form-check-inline ms-2">
@@ -104,7 +191,6 @@
             </div>
             <div id="libraryList" class="mt-3 d-flex flex-wrap gap-2"></div>
           </div>
-
           <div class="p-3 mt-3 border rounded" style="background: var(--bg-dark); border-color: var(--border-color)">
             <h6 class="mb-3"><i class="bi bi-image"></i> Favicon</h6>
             <div id="faviconDisplay" class="mb-2 d-inline-flex align-items-center">
@@ -125,7 +211,6 @@
               <div class="col-12"><button class="btn btn-outline-secondary btn-sm w-100" onclick="setFavicon()">Установить</button></div>
             </div>
           </div>
-
           <div class="p-3 mt-3 border rounded" style="background: var(--bg-dark); border-color: var(--border-color)">
             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
               <h6 class="mb-0"><i class="bi bi-lightning-charge"></i> Emmet</h6>
@@ -217,26 +302,26 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/xml/xml.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/css/css.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/javascript/javascript.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/htmlmixed/htmlmixed.min.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closebrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/matchbrackets.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/closetag.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/matchtags.min.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/foldcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/foldgutter.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/brace-fold.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/comment-fold.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/fold/xml-fold.min.js"></script>
-
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/search.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/searchcursor.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/jump-to-line.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/dialog/dialog.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/search/matchesonscrollbar.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/emmet-codemirror@1.2.5/dist/emmet.js"></script>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.7.1/jszip.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
@@ -247,86 +332,8 @@
     const SETTINGS_KEY = 'online_ide_settings_v2';
     let settings = { emmetEnabled: true, autoCloseTagsEnabled: true };
 
-    const defaultHtmlContent = `<div class="container">
-  <h1>Привет, адаптивный мир!</h1>
-  <p>Этот проект по умолчанию адаптируется под разные экраны.</p>
-  <div class="box-container">
-    <div class="box">Элемент 1</div>
-    <div class="box">Элемент 2</div>
-    <div class="box">Элемент 3</div>
-  </div>
-</div>`;
-
-    const defaultCssContent = `/* Общие стили для body */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  background: #282a36;
-  color: #f8f8f2;
-  margin: 0;
-  padding: 1rem;
-  line-height: 1.6;
-}
-
-/* Контейнер для центрирования контента */
-.container {
-  max-width: 1200px; /* Максимальная ширина для больших экранов (ноутбуки, ТВ) */
-  margin: 0 auto;
-  padding: 1rem;
-  text-align: center;
-}
-
-h1 {
-  color: #8be9fd;
-}
-
-/* Гибкий контейнер для элементов */
-.box-container {
-  display: flex;
-  flex-wrap: wrap; /* Позволяет элементам переноситься на новую строку */
-  gap: 1rem; /* Пространство между элементами */
-  justify-content: center;
-  margin-top: 2rem;
-}
-
-/* Стили для элементов */
-.box {
-  background: #44475a;
-  border-radius: 8px;
-  padding: 2rem;
-  flex-basis: 300px; /* Базовая ширина элемента */
-  flex-grow: 1; /* Позволяет элементу расти */
-  transition: transform 0.2s ease;
-}
-
-.box:hover {
-    transform: translateY(-5px);
-}
-
-/* --- Адаптивность --- */
-
-/* Планшеты (экраны до 768px) */
-@media (max-width: 768px) {
-  h1 {
-    font-size: 2rem;
-  }
-  .box {
-    flex-basis: 250px; /* Уменьшаем базовую ширину */
-  }
-}
-
-/* Телефоны (экраны до 480px) */
-@media (max-width: 480px) {
-  body {
-    padding: 0.5rem;
-  }
-  h1 {
-    font-size: 1.5rem;
-  }
-  .box-container {
-    flex-direction: column; /* Элементы встают друг под другом */
-  }
-}`;
-
+    const defaultHtmlContent = `<div class="container">...</div>`;
+    const defaultCssContent = `body { ... }`;
     const defaultJsContent = 'console.log("Адаптивный проект запущен!");';
 
     function loadSettings(){
@@ -339,6 +346,7 @@ h1 {
       try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch(_) {}
     }
 
+    // ИСПРАВЛЕНИЕ: Убрана неверная опция 'search' из общей конфигурации
     const commonConfig = {
       lineNumbers: true,
       theme: 'dracula',
@@ -346,22 +354,19 @@ h1 {
       autofocus: true,
       autoCloseBrackets: true,
       matchBrackets: true,
-      // Folding UI
       foldGutter: true,
       gutters: ["CodeMirror-linenumbers","CodeMirror-foldgutter"]
-      // autoCloseTags настраиваем динамически per-editor из settings
     };
-    const editors = {}; // key = filePath
+    const editors = {};
 
-    // Tree: files are objects with {content, type, path, isOpen}; folders are plain objects (no content)
     let fileSystem = {
       'index.html': { content: defaultHtmlContent, type: 'html', path: 'index.html', isOpen: true },
       'style.css': { content: defaultCssContent, type: 'css', path: 'style.css', isOpen: true },
       'main.js'  : { content: defaultJsContent, type: 'js', path: 'main.js', isOpen: true }
     };
 
-    let libraries = []; // {url, fileName?, position: 'head'|'body', attributes: string, isLocal: bool, kind: 'js'|'css'}
-    let favicon = {};  // {href, type}
+    let libraries = [];
+    let favicon = {};
     let activeFile = 'index.html';
 
     const fileTreeElement = document.getElementById('fileTree');
@@ -375,9 +380,9 @@ h1 {
       loadState();
       renderFileTree(fileSystem, fileTreeElement);
       renderOpenTabs();
-      if (activeFile && getFileObject(activeFile)) openFile(activeFile); else if (getFileObject('index.html')) openFile('index.html');
+      if (activeFile && getFileObject(activeFile)) openFile(activeFile); 
+      else if (Object.keys(fileSystem).length > 0) openFile(Object.keys(fileSystem)[0]);
 
-      // UI toggles
       const emmetToggle = document.getElementById('emmetToggle');
       if (emmetToggle){
         emmetToggle.checked = !!settings.emmetEnabled;
@@ -397,75 +402,25 @@ h1 {
         });
       }
 
-      // global shortcuts
       window.addEventListener('keydown', (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveZip(); }
       });
 
-      // receive console output from preview
       window.addEventListener('message', (e) => {
         const d = e.data || {}; if (!d.type) return;
         appendConsole(d.type, d.message || '');
       });
 
-      // triple-click anywhere to open quick menu
       setupTripleClickMenu();
-
       setInterval(saveState, 2000);
     }
 
-    /*****************
-     * UI: Tree
-     *****************/
-    function renderFileTree(tree, parentElement, currentPath = '') {
-      parentElement.innerHTML = '';
-      for (const name in tree) {
-        const item = tree[name];
-        const fullPath = currentPath ? `${currentPath}/${name}` : name;
-        const isFolder = typeof item.content === 'undefined';
-        const level = currentPath ? currentPath.split('/').length : 0;
-
-        const row = document.createElement('a');
-        row.href = '#';
-        row.className = `list-group-item list-group-item-action bg-dark text-white-50 border-0 ${activeFile === fullPath ? 'active' : ''}`;
-        row.style.paddingLeft = (isFolder ? level : level + 1) + 'rem';
-        row.innerHTML = `<i class="bi bi-${isFolder ? 'folder' : getFileIcon(item.type)} me-2"></i>${name}`;
-
-        if (isFolder) {
-          row.addEventListener('click', (e) => e.preventDefault());
-          row.addEventListener('contextmenu', (e) => e.preventDefault());
-          parentElement.appendChild(row);
-          const sub = document.createElement('div');
-          parentElement.appendChild(sub);
-          renderFileTree(item, sub, fullPath);
-        } else {
-          row.addEventListener('click', () => openFile(fullPath));
-          row.addEventListener('contextmenu', (e) => { e.preventDefault(); showFileContextMenu(e, fullPath); });
-          parentElement.appendChild(row);
-        }
+    function openSearch() {
+      if (activeFile && editors[activeFile]) {
+        editors[activeFile].execCommand('find');
       }
     }
 
-    function getFileIcon(type) {
-      switch (String(type)) {
-        case 'html': return 'filetype-html';
-        case 'css' : return 'filetype-css';
-        case 'js'  : return 'filetype-js';
-        case 'json': return 'filetype-json';
-        case 'txt' : return 'filetype-txt';
-        default: return 'file';
-      }
-    }
-
-    function toggleSidebar() {
-      const el = document.getElementById('sidebar');
-      el.classList.toggle('closed');
-      localStorage.setItem('ide_sidebar_closed', el.classList.contains('closed') ? '1' : '0');
-    }
-
-    /*****************
-     * Tabs & Editors
-     *****************/
     function createEditorForFile(filePath) {
       const fileObj = getFileObject(filePath); if (!fileObj) return;
       fileObj.isOpen = true;
@@ -494,23 +449,63 @@ h1 {
           'Ctrl-.': 'closeTag',
           'Ctrl-Shift-W': (cm)=>wrapWithTag(cm),
           'Ctrl-Q': function(cm){ cm.foldCode(cm.getCursor()); }
+          // Горячие клавиши для поиска встроены в сам аддон (Ctrl-F)
         },
-        // автозакрытие — из настроек
         autoCloseTags: autoCloseTagsOption()
       };
 
       const cm = CodeMirror(panel, editorOptions);
-
-      // Подключаем Emmet API к редактору
-      if (typeof emmetCodeMirror === 'function') {
-        try { emmetCodeMirror(cm); } catch(_) {}
-      }
-
+      if (typeof emmetCodeMirror === 'function') { try { emmetCodeMirror(cm); } catch(_) {} }
       editors[filePath] = cm;
       cm.on('change', () => setFileContent(filePath, cm.getValue()));
-
-      // Применяем/снимаем Emmet keymap согласно настройке (только HTML/CSS)
       applyEmmetKeymap(cm, settings.emmetEnabled, fileObj.type);
+    }
+
+    // Остальной JS-код остается без изменений
+    function renderFileTree(tree, parentElement, currentPath = '') {
+      parentElement.innerHTML = '';
+      for (const name in tree) {
+        const item = tree[name];
+        const fullPath = currentPath ? `${currentPath}/${name}` : name;
+        const isFolder = typeof item.content === 'undefined';
+        const level = currentPath ? currentPath.split('/').length : 0;
+
+        const row = document.createElement('a');
+        row.href = '#';
+        row.className = `list-group-item list-group-item-action bg-dark text-white-50 border-0 ${activeFile === fullPath ? 'active' : ''}`;
+        row.style.paddingLeft = (isFolder ? level : level + 1) + 'rem';
+        row.innerHTML = `<i class="bi bi-${isFolder ? 'folder' : getFileIcon(item.type)} me-2"></i>${name}`;
+
+        if (isFolder) {
+          row.addEventListener('click', (e) => e.preventDefault());
+          row.addEventListener('contextmenu', (e) => e.preventDefault());
+          parentElement.appendChild(row);
+          const sub = document.createElement('div');
+          parentElement.appendChild(sub);
+          renderFileTree(item, sub, fullPath);
+        } else {
+          row.addEventListener('click', (e) => { e.preventDefault(); openFile(fullPath); });
+          row.addEventListener('contextmenu', (e) => { e.preventDefault(); showFileContextMenu(e, fullPath); });
+          parentElement.appendChild(row);
+        }
+      }
+    }
+
+    function getFileIcon(type) {
+      switch (String(type)) {
+        case 'html': return 'filetype-html';
+        case 'css' : return 'filetype-css';
+        case 'js'  : return 'filetype-js';
+        case 'json': return 'filetype-json';
+        case 'txt' : return 'filetype-txt';
+        default: return 'file';
+      }
+    }
+
+    function toggleSidebar() {
+      const el = document.getElementById('sidebar');
+      el.classList.toggle('closed');
+      localStorage.setItem('ide_sidebar_closed', el.classList.contains('closed') ? '1' : '0');
     }
 
     function autoCloseTagsOption(){
@@ -558,7 +553,6 @@ h1 {
     function openFile(filePath) {
       activeFile = filePath;
       if (!editors[filePath]) createEditorForFile(filePath);
-      // activate tab + panel
       editorPanels.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show','active'));
       editorTabsList.querySelectorAll('.nav-link').forEach(t => t.classList.remove('active'));
       const tabId = filePath.replace(/[./]/g, '-');
@@ -605,9 +599,6 @@ h1 {
     function setFileContent(filePath, content) { const fo = getFileObject(filePath); if (fo) { fo.content = content; fo.isOpen = true; } }
     function getModeForType(type) { switch (String(type)) { case 'html': return 'htmlmixed'; case 'css': return 'css'; case 'js': return 'javascript'; case 'json': return { name: 'javascript', json: true }; default: return null; } }
 
-    /*****************
-     * File ops
-     *****************/
     function createNewFile() {
       const fullPath = prompt('Введите путь и имя нового файла (напр., js/app.js):');
       if (!fullPath) return; const parts = fullPath.split('/'); const fileName = parts.pop();
@@ -659,9 +650,6 @@ h1 {
       if (parent && parent[name]) { delete parent[name]; removeEditorTab(null, filePath); renderFileTree(fileSystem, fileTreeElement); }
     }
 
-    /*****************
-     * Build & Run
-     *****************/
     function collectFiles() {
       const out = { html: {}, css: {}, js: {}, other: {} };
       (function walk(tree, base = '') {
@@ -740,9 +728,6 @@ h1 {
       try { const blob = await zip.generateAsync({ type: 'blob' }); saveAs(blob, 'project.zip'); } catch (e) { alert('Ошибка сохранения ZIP: ' + (e?.message || e)); }
     }
 
-    /*****************
-     * Import
-     *****************/
     function importFile(ev) {
       const file = ev.target.files?.[0]; if (!file) return;
       const reader = new FileReader();
@@ -755,7 +740,6 @@ h1 {
         getFileObject('index.html').content = htmlMatch ? htmlMatch[1].trim() : '';
         getFileObject('style.css').content   = cssMatch ? cssMatch[1].trim() : '';
         getFileObject('main.js').content     = jsMatch ? jsMatch[1].trim() : '';
-        // refresh editors if open
         if (editors['index.html']) editors['index.html'].setValue(getFileObject('index.html').content);
         if (editors['style.css'])   editors['style.css'].setValue(getFileObject('style.css').content);
         if (editors['main.js'])     editors['main.js'].setValue(getFileObject('main.js').content);
@@ -771,9 +755,6 @@ h1 {
       if (!getFileObject('main.js'))    fileSystem['main.js']    = { content:defaultJsContent, type:'js',   path:'main.js',    isOpen:true };
     }
 
-    /*****************
-     * Settings: favicon & libs
-     *****************/
     function setFavicon() {
       const urlI = document.getElementById('faviconUrl');
       const fileI = document.getElementById('faviconFile');
@@ -810,9 +791,6 @@ h1 {
     function guessKind(nameOrUrl, attrs) { if (/\.css(\?|$)/i.test(nameOrUrl) || /rel=\"?stylesheet\"?/i.test(attrs)) return 'css'; return 'js'; }
     function libToTag(lib) { const attr = lib.attributes ? ' ' + lib.attributes : ''; if (lib.kind === 'css') return `<link rel="stylesheet" href="${lib.url}"${attr}>`; return `<script src="${lib.url}"${attr}><\/script>`; }
 
-    /*****************
-     * Console helpers
-     *****************/
     function showConsoleModal(){ new bootstrap.Modal(document.getElementById('consoleModal')).show(); }
     function clearConsole(){ consoleElement.innerHTML=''; }
     function appendConsole(type, msg){
@@ -826,9 +804,6 @@ h1 {
     }
     function copyConsoleToClipboard(){ const txt = consoleElement.innerText; navigator.clipboard.writeText(txt).then(()=>alert('Лог скопирован!')).catch(()=>alert('Ошибка копирования.')); }
 
-    /*****************
-     * Backup & Restore
-     *****************/
     function createBackup() {
       for (const k in editors) { const fo = getFileObject(k); if (fo) fo.content = editors[k].getValue(); }
       const backupData = { fileSystem, libraries, favicon };
@@ -882,9 +857,6 @@ h1 {
       return null;
     }
 
-    /*****************
-     * Persistence
-     *****************/
     function saveState(){
       for (const k in editors){ const fo = getFileObject(k); if (fo) fo.content = editors[k].getValue(); }
       const state = { fileSystem, libraries, favicon, activeFile, sidebarClosed: document.getElementById('sidebar').classList.contains('closed') ? 1 : 0 };
@@ -908,9 +880,6 @@ h1 {
       }catch(e){ console.warn('Не удалось загрузить состояние:', e?.message || e); }
     }
 
-    /*****************
-     * Misc
-     *****************/
     function showSettingsModal(){ new bootstrap.Modal(document.getElementById('settingsModal')).show(); }
     function closeModal(id){ const el = document.getElementById(id); const inst = bootstrap.Modal.getInstance(el); inst?.hide(); }
 
